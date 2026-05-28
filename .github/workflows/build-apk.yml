@@ -1,4 +1,5 @@
-name: Build Android APK
+.env:
+  name: Build Android APK
 
 on:
   push:
