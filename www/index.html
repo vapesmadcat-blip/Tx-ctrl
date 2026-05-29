@@ -132,6 +132,7 @@
         }
 
         .row-id { font-weight: bold; color: var(--texto-secundario); }
+        .row-cliente { font-weight: 600; color: var(--texto); }
 
         .result-row {
             display: flex;
@@ -206,6 +207,19 @@
             border-color: var(--primary);
         }
 
+        .gps-display-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
         .modal-buttons {
             display: flex;
             gap: 10px;
@@ -237,187 +251,3 @@
 
     <div class="btn-group-main">
         <button class="btn-primary" onclick="abrirModalInsercao()">➕ Adicionar</button>
-        <button class="btn-primary" style="background: #6366f1;" onclick="calcularTotais()">📊 Totalizador</button>
-        <button class="btn-success" onclick="gerarRelatorio()">📄 Mostrar Relatório</button>
-    </div>
-
-    <div class="card">
-        <h2>Lançamentos Atuais</h2>
-        <div class="table-wrapper">
-            <table id="tabelaDados">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Empréstimo</th>
-                        <th>Corrida</th>
-                        <th>Ação</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-    </div>
-
-    <div class="card" id="cardTotais" style="display: none;">
-        <h2>Resumo Calculado</h2>
-        <div class="result-row"><span>Empréstimos Brutos:</span> <span id="totBruto">R$ 0,00</span></div>
-        <div class="result-row"><span>Taxa Adicional (+20%):</span> <span id="totAcrescimo" class="danger-text">+ R$ 0,00</span></div>
-        <div class="result-row"><span>Total Corridas:</span> <span id="totCorridas">R$ 0,00</span></div>
-        <div class="result-row total-final"><span>Total Geral a Receber:</span> <span id="totGeral">R$ 0,00</span></div>
-    </div>
-
-    <div class="card" id="cardRelatorio" style="display: none;">
-        <h2>Relatório de Exportação</h2>
-        <div class="report-output" id="reportOutput"></div>
-        <button class="btn-success" style="margin-top:15px; width:100%;" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
-    </div>
-</div>
-
-<div class="modal" id="formModal">
-    <div class="modal-content">
-        <h3 id="modalTitle">Novo Lançamento</h3>
-        <input type="hidden" id="editId">
-        
-        <div class="input-group">
-            <label for="inputEmprestimo">Dinheiro Emprestado (R$)</label>
-            <input type="number" step="0.01" id="inputEmprestimo" placeholder="0,00">
-        </div>
-
-        <div class="input-group">
-            <label for="inputCorrida">Valor da Corrida (R$)</label>
-            <input type="number" step="0.01" id="inputCorrida" placeholder="0,00">
-        </div>
-
-        <div class="modal-buttons">
-            <button class="btn-cancel" onclick="fecharModal()">Voltar</button>
-            <button class="btn-primary" style="flex: 1;" onclick="salvarDados()">Confirmar</button>
-        </div>
-    </div>
-</div>
-
-<script>
-    let registros = [];
-    let contadorId = 1;
-
-    function formatarMoeda(v) {
-        return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    }
-
-    function abrirModalInsercao() {
-        document.getElementById('modalTitle').innerText = "Novo Lançamento";
-        document.getElementById('editId').value = "";
-        document.getElementById('inputEmprestimo').value = "";
-        document.getElementById('inputCorrida').value = "";
-        document.getElementById('formModal').style.display = 'flex';
-    }
-
-    function fecharModal() {
-        document.getElementById('formModal').style.display = 'none';
-    }
-
-    function abrirModalEdicao(id) {
-        const reg = registros.find(r => r.id === id);
-        if (!reg) return;
-
-        document.getElementById('modalTitle').innerText = `Editar Registro #${id}`;
-        document.getElementById('editId').value = id;
-        document.getElementById('inputEmprestimo').value = reg.emprestado;
-        document.getElementById('inputCorrida').value = reg.corrida;
-        document.getElementById('formModal').style.display = 'flex';
-    }
-
-    function salvarDados() {
-        const idEdit = document.getElementById('editId').value;
-        const vEmprestimo = parseFloat(document.getElementById('inputEmprestimo').value) || 0;
-        const vCorrida = parseFloat(document.getElementById('inputCorrida').value) || 0;
-
-        // Captura data e hora atuais para o registro
-        const agora = new Date();
-        const dataHoraStr = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-
-        if (idEdit) {
-            const reg = registros.find(r => r.id === parseInt(idEdit));
-            if (reg) {
-                reg.emprestado = vEmprestimo;
-                reg.corrida = vCorrida;
-                reg.dataHora = dataHoraStr;
-            }
-        } else {
-            registros.push({ id: contadorId++, emprestado: vEmprestimo, corrida: vCorrida, dataHora: dataHoraStr });
-        }
-
-        fecharModal();
-        renderizarTabela();
-        resetarPaineis();
-    }
-
-    function renderizarTabela() {
-        const tbody = document.querySelector('#tabelaDados tbody');
-        tbody.innerHTML = '';
-
-        registros.forEach(reg => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="row-id">#${reg.id}</td>
-                <td>${formatarMoeda(reg.emprestado)}</td>
-                <td>${formatarMoeda(reg.corrida)}</td>
-                <td><button class="btn-warning" onclick="abrirModalEdicao(${reg.id})">Editar</button></td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-
-    function resetarPaineis() {
-        document.getElementById('cardTotais').style.display = 'none';
-        document.getElementById('cardRelatorio').style.display = 'none';
-    }
-
-    function calcularTotais() {
-        let tBruto = 0, tCorridas = 0;
-        registros.forEach(r => { tBruto += r.emprestado; tCorridas += r.corrida; });
-
-        let juros = tBruto * 0.20;
-        let tGeral = tBruto + juros + tCorridas;
-
-        document.getElementById('totBruto').innerText = formatarMoeda(tBruto);
-        document.getElementById('totAcrescimo').innerText = `+ ${formatarMoeda(juros)}`;
-        document.getElementById('totCorridas').innerText = formatarMoeda(tCorridas);
-        document.getElementById('totGeral').innerText = formatarMoeda(tGeral);
-
-        document.getElementById('cardTotais').style.display = 'block';
-    }
-
-    function gerarRelatorio() {
-        if (registros.length === 0) return alert("Adicione dados primeiro!");
-
-        let tBruto = 0, tCorridas = 0;
-        let txt = `🧾 DRIVERFLUX - RELATÓRIO DETALHADO\n`;
-        txt += `Emitido em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}\n`;
-        txt += `=========================================\n\n`;
-
-        registros.forEach(r => {
-            tBruto += r.emprestado; tCorridas += r.corrida;
-            txt += `[${r.dataHora}] Reg #${r.id}\n`;
-            txt += `  -> Empréstimo: ${formatarMoeda(r.emprestado)}\n`;
-            txt += `  -> Corrida:    ${formatarMoeda(r.corrida)}\n`;
-            txt += `-----------------------------------------\n`;
-        });
-
-        let juros = tBruto * 0.20;
-        let tGeral = tBruto + juros + tCorridas;
-
-        txt += `\n=========================================\n`;
-        txt += `Subtotal Empréstimos:    ${formatarMoeda(tBruto)}\n`;
-        txt += `Taxa Adicional (+20%):   ${formatarMoeda(juros)}\n`;
-        txt += `Subtotal Corridas:       ${formatarMoeda(tCorridas)}\n`;
-        txt += `-----------------------------------------\n`;
-        txt += `VALOR TOTAL A RECEBER:   ${formatarMoeda(tGeral)}\n`;
-        txt += `=========================================`;
-
-        document.getElementById('reportOutput').innerText = txt;
-        document.getElementById('reportOutput').style.display = 'block';
-        document.getElementById('cardRelatorio').style.display = 'block';
-    }
-</script>
-</body>
-</html>
