@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -58,7 +58,6 @@
             margin-top: 4px;
         }
 
-        /* Grade de botões principais do topo */
         .btn-grid-actions {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -89,7 +88,7 @@
         .btn-alterar { background: var(--warning); color: white; padding: 6px 12px; font-size: 12px; border-radius: 6px; }
         .btn-cancel { background: #e2e8f0; color: var(--texto); width: 40%; }
 
-        /* Barra de pesquisa de consulta (oculta por padrão) */
+        /* Painel de Consulta Avançada e Pagamentos */
         .search-container {
             display: none;
             margin-bottom: 16px;
@@ -101,13 +100,65 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .search-container input {
-            width: 100%;
+        .search-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .search-box input {
+            flex: 1;
             padding: 12px;
             border: 2px solid var(--primary);
             border-radius: 10px;
             font-size: 15px;
             outline: none;
+        }
+
+        /* Ficha Resumo do Cliente */
+        .client-ledger-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 14px;
+            display: none;
+        }
+
+        .client-ledger-box h3 {
+            font-size: 14px;
+            color: var(--primary);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .ledger-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .ledger-row.balance {
+            font-weight: 800;
+            border-top: 1px dashed #cbd5e1;
+            padding-top: 8px;
+            margin-top: 8px;
+        }
+
+        .pay-input-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .pay-input-group input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 14px;
         }
 
         .card {
@@ -137,8 +188,8 @@
         .result-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
         .result-row.total-final { margin-top: 14px; padding-top: 14px; border-top: 2px dashed #e2e8f0; font-size: 17px; font-weight: 800; color: var(--primary); }
         .danger-text { color: var(--danger); font-weight: 600; }
+        .success-text { color: var(--success); font-weight: 600; }
 
-        /* Estrutura do Janela Modal */
         .modal {
             display: none;
             position: fixed;
@@ -166,7 +217,6 @@
         .input-group input { width: 100%; padding: 11px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 15px; outline: none; }
         .input-group input:focus { border-color: var(--primary); }
 
-        /* Quadro de status do GPS */
         .gps-display-box {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
@@ -193,13 +243,29 @@
 
     <div class="btn-grid-actions">
         <button class="btn-incluir" onclick="abrirModalInsercao()">➕ Incluir</button>
-        <button class="btn-consultar" onclick="alternarBarraConsulta()">🔍 Consultar</button>
+        <button class="btn-consultar" onclick="alternarBarraConsulta()">🔍 Consultar / Pgto</button>
         <button class="btn-totais" onclick="calcularTotais()">📊 Totais</button>
         <button class="btn-relatorio" onclick="gerarRelatorio()">📄 Relatório</button>
     </div>
 
     <div class="search-container" id="containerPesquisa">
-        <input type="text" id="inputPesquisa" placeholder="Filtrar por nome do cliente..." oninput="filtrarTabela()">
+        <div class="search-box">
+            <input type="text" id="inputPesquisa" placeholder="Selecione ou digite o nome do cliente..." list="listaClientesConsulta" oninput="processarConsultaCliente()" autocomplete="off">
+            <datalist id="listaClientesConsulta"></datalist>
+            <button onclick="limparConsulta()" style="background:#e2e8f0; padding:0 12px; border-radius:10px; font-size:12px;">Limpar</button>
+        </div>
+
+        <div class="client-ledger-box" id="fichaCliente">
+            <h3 id="ledgerNomeCliente">Extrato do Cliente</h3>
+            <div class="ledger-row"><span>Total Bruto Devido:</span> <span id="ledgerTotalDevido">R$ 0,00</span></div>
+            <div class="ledger-row"><span>Total Amortizado/Pago:</span> <span id="ledgerTotalPago" class="success-text">R$ 0,00</span></div>
+            <div class="ledger-row balance" id="ledgerLinhaSaldo"><span>Saldo Restante:</span> <span id="ledgerSaldoFinal">R$ 0,00</span></div>
+            
+            <div class="pay-input-group">
+                <input type="number" step="0.01" id="inputValorPagamento" placeholder="Registrar pagamento (R$)">
+                <button class="btn-relatorio" style="padding:10px 14px;" onclick="registrarPagamento()">Amortizar</button>
+            </div>
+        </div>
     </div>
 
     <div class="card">
@@ -221,15 +287,15 @@
     </div>
 
     <div class="card" id="cardTotais" style="display: none;">
-        <h2>Resumo Calculado</h2>
+        <h2>Resumo Geral Calculado</h2>
         <div class="result-row"><span>Empréstimos Brutos:</span> <span id="totBruto">R$ 0,00</span></div>
         <div class="result-row"><span>Taxa Adicional (+20%):</span> <span id="totAcrescimo" class="danger-text">+ R$ 0,00</span></div>
         <div class="result-row"><span>Total Corridas:</span> <span id="totCorridas">R$ 0,00</span></div>
-        <div class="result-row total-final"><span>Total Geral a Receber:</span> <span id="totGeral">R$ 0,00</span></div>
+        <div class="result-row total-final"><span>Total Geral Cadastrado:</span> <span id="totGeral">R$ 0,00</span></div>
     </div>
 
     <div class="card" id="cardRelatorio" style="display: none;">
-        <h2>Relatório Comercial</h2>
+        <h2>Relatório Comercial Completo</h2>
         <div class="report-output" id="reportOutput"></div>
         <button class="btn-relatorio" style="margin-top:12px; width:100%;" onclick="window.print()">🖨️ Imprimir / PDF</button>
     </div>
