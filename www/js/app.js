@@ -1,6 +1,6 @@
 /**
  * APP.JS - DriverFlux Oficial (Com Hodômetro, Cobrança de Fiado e Emissão de Recibo Corporativo)
- * Lógica de Negócio Completa com Atalhos de Teste e Persistência Unificada Direta
+ * Lógica de Negócio Completa com Atalhos de Teste e Persistência Síncrona Segura
  */
 
 const firebaseConfig = {
@@ -123,10 +123,6 @@ function verificarSessaoLogin() {
     }
 }
 
-function activarVersaoCompletaDefinitiva() {
-    ativarVersãoCompletaDefinitiva();
-}
-
 function abrirModalEdicao(id) { 
     if (localStorage.getItem('driverflux_modo_demo') === 'true' && id !== null) { alert("🔒 Edição de registros bloqueada no modo de demonstração."); return; }
     
@@ -166,6 +162,155 @@ function capturarGpsAntecipadoEAtualizarVisor() {
     } else {
         coordenadaAtual = "Não suportado";
         if (elVisor) elVisor.innerText = "❌ GPS: Sem suporte";
+    }
+}
+
+function ativarVersãoCompletaDefinitiva() {
+    localStorage.setItem('driverflux_licenca_ativa', 'true');
+    localStorage.setItem('driverflux_modo_demo', 'false');
+    localStorage.setItem('driverflux_demo_ja_utilizada', 'true');
+    
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+    db = firebase.database();
+
+    const caronaDemo = localStorage.getItem('driverflux_demo_reg');
+    if (caronaDemo) {
+        const corridasParaMigrar = JSON.parse(caronaDemo);
+        if (corridasParaMigrar.length > 0) {
+            const migracaoRef = db.ref("corridas_por_turno/MIGRADO_DA_DEMO");
+            corridasParaMigrar.forEach(reg => {
+                migracaoRef.push({
+                    id: reg.id, tipo: reg.tipo, cliente: reg.cliente + " (Vindo da Demo)",
+                    emprestado: reg.emprestado || 0, corrida: reg.corrida, dataHora: reg.dataHora || "Data Demo", gps: null
+                });
+            });
+            alert("📦 Sucesso! Corridas registradas na demo foram migradas para a nuvem!");
+        }
+    }
+    alert("🚀 Sistema COMPLETO liberado!");
+    location.reload(); 
+}
+
+function verificarStatusTurnoMotorista() {
+    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
+        const tStatus = localStorage.getItem('driverflux_demo_status') || 'fechado';
+        if (tStatus === 'aberto') {
+            idTurnoAtivo = "DEMO-LOCAL";
+            document.getElementById('telaAberturaTurno').style.display = 'none';
+            document.getElementById('conteudoApp').style.display = 'block';
+            document.getElementById('lblUsuarioAtivo').innerText = "Operador: TESTE DEMO";
+            document.getElementById('lblIdTurnoAtivo').innerText = "Modo: Demonstração Off-line";
+            inicializarMotorista();
+        } else {
+            document.getElementById('conteudoApp').style.display = 'none';
+            document.getElementById('telaAberturaTurno').style.display = 'block';
+        }
+        return;
+    }
+
+    iniciarFirebaseSeNecessario();
+    db.ref(`turnos_operacionais/${usuarioLogado}`).orderByChild("status").equalTo("aberto").limitToLast(1).once("value", (snapshot) => {
+        if (snapshot.exists()) {
+            snapshot.forEach(child => { idTurnoAtivo = child.key; metadadosTurno = child.val(); });
+            document.getElementById('telaAberturaTurno').style.display = 'none';
+            document.getElementById('conteudoApp').style.display = 'block';
+            document.getElementById('lblIdTurnoAtivo').innerText = `Turno Ativo: #${idTurnoAtivo.substring(1, 8).toUpperCase()}`;
+            inicializarMotorista();
+        } else {
+            document.getElementById('conteudoApp').style.display = 'none';
+            document.getElementById('telaAberturaTurno').style.display = 'block';
+        }
+    });
+}
+
+function abrirTurnoOperacional() {
+    const troco = parseFloat(document.getElementById('inputTrocoInicial').value) || 0;
+    const km = parseInt(document.getElementById('inputKmInicial').value) || 0;
+    if(km <= 0) return alert("⚠️ Por favor, digite a quilometragem atual do Hodômetro.");
+
+    const agora = new Date();
+    const dataStr = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+    
+    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
+        localStorage.setItem('driverflux_demo_troco', troco);
+        localStorage.setItem('driverflux_demo_km', km);
+        localStorage.setItem('driverflux_demo_status', 'aberto');
+        metadadosTurno = { id: "DEMO-LOCAL", motorista: "teste_demo", status: "aberto", abertura: dataStr, trocoInicial: troco, kmInicial: km, tipoContrato: "demo" };
+        verificarStatusTurnoMotorista();
+        return;
+    }
+
+    iniciarFirebaseSeNecessario();
+    db.ref(`usuarios/${usuarioLogado}`).once('value').then((snapshot) => {
+        const dadosUser = snapshot.val();
+        const tipoContrato = (dadosUser && dadosUser.tipo) ? dadosUser.tipo : "efetivo";
+        const novoTurnoRef = db.ref(`turnos_operacionais/${usuarioLogado}`).push();
+        idTurnoAtivo = novoTurnoRef.key;
+        metadadosTurno = { id: idTurnoAtivo, motorista: usuarioLogado, status: "aberto", abertura: dataStr, trocoInicial: troco, kmInicial: km, tipoContrato: tipoContrato };
+        novoTurnoRef.set(metadadosTurno).then(() => verificarStatusTurnoMotorista());
+    });
+}
+
+function encerrarTurnoDefinitivo() {
+    let kmFinal = prompt("🚗 Para fechar o caixa, insira a QUILOMETRAGEM FINAL (Hodômetro):");
+    if (!kmFinal) return alert("⚠️ Encerramento cancelado. É obrigatório informar a KM Final.");
+    kmFinal = parseInt(kmFinal);
+    
+    let kmInicialVal = (localStorage.getItem('driverflux_modo_demo') === 'true') ? parseInt(localStorage.getItem('driverflux_demo_km')) : metadadosTurno.kmInicial;
+    if(kmFinal < kmInicialVal) return alert(`❌ Erro! A KM Final não pode ser menor que a Inicial (${kmInicialVal} KM).`);
+
+    const agora = new Date();
+    const dataStr = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+    
+    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
+        localStorage.setItem('driverflux_demo_status', 'fechado');
+        alert(`Caixa encerrado!\nDistância Rodada: ${kmFinal - kmInicialVal} KM.`);
+        verificarStatusTurnoMotorista();
+        return;
+    }
+
+    iniciarFirebaseSeNecessario();
+    db.ref(`turnos_operacionais/${usuarioLogado}/${idTurnoAtivo}`).update({ 
+        status: "fechado", fechamento: dataStr, kmFinal: kmFinal, kmTotalRodado: (kmFinal - kmInicialVal)
+    }).then(() => {
+        alert("🔴 Turno encerrado e enviado para auditoria Master!");
+        efetuarLogoutPronto();
+    });
+}
+
+function inicializarMotorista() {
+    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
+        const r = localStorage.getItem('driverflux_demo_reg');
+        const p = localStorage.getItem('driverflux_demo_pag');
+        registros = r ? JSON.parse(r) : []; pagamentos = p ? JSON.parse(p) : [];
+        renderToggleAcoesDemo(); renderizarTabela(); atualizarListaSugestoes();
+        return;
+    }
+
+    const cache = localStorage.getItem(`driverflux_cache_${idTurnoAtivo}`);
+    if (cache) { registros = JSON.parse(cache); renderizarTabela(); }
+
+    iniciarFirebaseSeNecessario();
+    db.ref(`corridas_por_turno/${idTurnoAtivo}`).on("value", (snapshot) => {
+        registros = []; const data = snapshot.val();
+        if (data) { Object.keys(data).forEach(k => { let item = data[k]; item.docId = k; registros.push(item); }); registros.sort((a, b) => a.id - b.id); }
+        localStorage.setItem(`driverflux_cache_${idTurnoAtivo}`, JSON.stringify(registros));
+        renderizarTabela(); atualizarListaSugestoes();
+    });
+}
+
+function renderToggleAcoesDemo() {
+    if (!document.getElementById('badgeAvisoContador')) {
+        let div = document.createElement('div'); div.id = "badgeAvisoContador";
+        div.style.cssText = "background:#fffbeb; color:#b45309; font-size:11px; padding:8px; border-radius:8px; text-align:center; width:100%; margin-bottom:10px; font-weight:bold; cursor:pointer;";
+        div.innerText = `📈 Limite Demo: ${registros.length} de ${LIMITE_DEMO} registros. (Clique aqui para Ativar)`;
+        div.onclick = function() {
+            let senhaUpgrade = prompt("🔑 Insira a Contra-Senha de Liberação Definitiva (Ou 222 na bancada):");
+            if (senhaUpgrade && (parseInt(senhaUpgrade) === 222 || parseInt(senhaUpgrade) === obterSenhaDefinitiva(localStorage.getItem('driverflux_codigo_desafio')))) {
+                ativarVersãoCompletaDefinitiva();
+            } else if (senhaUpgrade) { alert("❌ Contra-senha inválida!"); }
+        };
+        document.getElementById('conteudoApp').insertBefore(div, document.getElementById('conteudoApp').firstChild);
     }
 }
 
@@ -366,7 +511,7 @@ function configurarDatalistsUI(nomesArray) { const unicos = [...new Set(nomesArr
 function alternarBarraConsulta() { const container = document.getElementById('containerPesquisa'); container.style.display = (container.style.display === 'block') ? 'none' : 'block'; if(container.style.display === 'block') document.getElementById('inputPesquisa').focus(); }
 function limparConsulta() { document.getElementById('inputPesquisa').value = ""; document.getElementById('fichaCliente').style.display = 'none'; filtroTexto = ""; renderizarTabela(); }
 function formatarMoeda(v) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-function garantirUsuariosBaseNoFirebase() { db.ref("usuarios").once("value", (snapshot) => { if (!snapshot.exists()) { db.ref("usuarios").set({ "master": { senha: "master123", tipo: "gerente" }, "andre": { senha: "123", tipo: "folguista" }, "pedro": { senha: "456", tipo: "efetivo" } }); } }); }
+function garantizarUsuariosBaseNoFirebase() { db.ref("usuarios").once("value", (snapshot) => { if (!snapshot.exists()) { db.ref("usuarios").set({ "master": { senha: "master123", tipo: "gerente" }, "andre": { senha: "123", tipo: "folguista" }, "pedro": { senha: "456", tipo: "efetivo" } }); } }); }
 function ajustarCamposPorModalidade() { const tipo = document.getElementById('inputTipoLancamento').value; document.getElementById('camposCreditoOpcionais').style.display = (tipo === 'credito') ? 'block' : 'none'; }
 function fecharModal() { document.getElementById('formModal').style.display = 'none'; }
 
