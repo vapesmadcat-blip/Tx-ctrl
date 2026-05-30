@@ -133,7 +133,7 @@ function verificarSessaoLogin() {
 function abrirModalEdicao(id) { 
     if (localStorage.getItem('driverflux_modo_demo') === 'true' && id !== null) { alert("🔒 Edição de registros bloqueada no modo de demonstração."); return; }
     
-    capturarGpsAntecipadoEAtualizarVisor();
+    // Captura removida daqui para ser feita no salvamento (final da corrida)
 
     if (id === null) {
         document.getElementById('modalTitle').innerText = `Lançar Corrida`; 
@@ -171,23 +171,24 @@ function ajustarCamposPorModalidade() {
     }
 }
 
-function capturarGpsAntecipadoEAtualizarVisor() {
-    coordenadaAtual = "Não capturado";
-    console.log("Capturando localização...");
-
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                coordenadaAtual = `${position.coords.latitude.toFixed(5)}, ${position.coords.longitude.toFixed(5)}`;
-            },
-            (error) => {
-                coordenadaAtual = "Não capturado";
-            },
-            { enableHighAccuracy: true, timeout: 6000 }
-        );
-    } else {
-        coordenadaAtual = "Não suportado";
-    }
+// Função de captura agora retorna uma Promise para ser usada de forma síncrona no salvamento
+function capturarGpsPromessa() {
+    return new Promise((resolve) => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const coord = `${position.coords.latitude.toFixed(5)}, ${position.coords.longitude.toFixed(5)}`;
+                    resolve(coord);
+                },
+                (error) => {
+                    resolve("Não capturado");
+                },
+                { enableHighAccuracy: true, timeout: 5000 }
+            );
+        } else {
+            resolve("Não suportado");
+        }
+    });
 }
 
 function injetarCampoPrefixoCarroSeNecessario() {
@@ -276,7 +277,8 @@ function abrirTurnoOperacional() {
     });
 }
 
-function salvarDados() {
+// Agora a função de salvamento é assíncrona para esperar o GPS
+async function salvarDados() {
     const editId = document.getElementById('editId').value;
     const tipo = document.getElementById('inputTipoLancamento').value;
     const vCorrida = parseFloat(document.getElementById('inputCorrida').value) || 0;
@@ -291,6 +293,10 @@ function salvarDados() {
         if (!nomeCliente) return alert("⚠️ Digite o nome do cliente.");
     }
 
+    // Bloquear botão ou mostrar loading se necessário (opcional)
+    console.log("Capturando GPS final...");
+    const gpsFinal = await capturarGpsPromessa();
+
     const agora = new Date();
     const dataHoraStr = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
 
@@ -300,7 +306,7 @@ function salvarDados() {
         emprestado: vEmprestimo, 
         corrida: vCorrida, 
         dataHora: dataHoraStr, 
-        gps: coordenadaAtual, 
+        gps: gpsFinal, 
         whatsCliente: whatsCliente
     };
 
