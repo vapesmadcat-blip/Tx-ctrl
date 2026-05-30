@@ -1,6 +1,6 @@
 /**
  * APP.JS - DriverFlux Oficial (Com Hodômetro, Cobrança de Fiado e Emissão de Recibo Corporativo)
- * Lógica de Negócio Completa com Atalhos de Desenvolvimento (1 para Demo, 222 para Completo)
+ * Lógica de Negócio Completa com Atalhos de Teste e Captura de GPS no Momento do Lançamento
  */
 
 const firebaseConfig = {
@@ -33,7 +33,6 @@ let motoristasCadastroMaster = {};
 
 const LIMITE_DEMO = 10;
 
-// BLINDAGEM DE CONTRA-SENHAS (Mantendo a estrutura de cálculos ativa para produção)
 function obterSenhaDefinitiva(desafio) { return (parseInt(desafio) * 13) + 6182; }
 function obterSenhaDemo(desafio) { return (parseInt(desafio) * 11) + 3947; }
 
@@ -56,7 +55,6 @@ function checarLicenciamento() {
     }
 }
 
-// Injeção de bypass rápido para ambiente de desenvolvimento/testes
 function verificarAtivacao() {
     const desafio = localStorage.getItem('driverflux_codigo_desafio');
     const inputVal = document.getElementById('inputContraSenha').value.trim();
@@ -64,7 +62,6 @@ function verificarAtivacao() {
     
     const digitada = parseInt(inputVal);
 
-    // Bypass rápido para testes na bancada
     if (digitada === 222) {
         alert("🛠️ [Bancada] Forçando ativação do MODO COMPLETO...");
         ativarVersãoCompletaDefinitiva();
@@ -79,7 +76,6 @@ function verificarAtivacao() {
         return;
     }
 
-    // Validação padrão da semente (Para produção na rua)
     if (digitada === obterSenhaDefinitiva(desafio)) {
         ativarVersãoCompletaDefinitiva();
     } else if (digitada === obterSenhaDemo(desafio)) {
@@ -125,6 +121,10 @@ function verificarSessaoLogin() {
         iniciarFirebaseSeNecessario();
         garantirUsuariosBaseNoFirebase();
     }
+}
+
+function activarVersaoCompletaDefinitiva() {
+    ativarVersãoCompletaDefinitiva();
 }
 
 function ativarVersãoCompletaDefinitiva() {
@@ -276,6 +276,7 @@ function renderToggleAcoesDemo() {
     }
 }
 
+// CAPTURA DO GPS INTERCEPTADA: Pede a geolocalização no milissegundo em que confirma o pagamento/fechamento
 function salvarDados() {
     const tipo = document.getElementById('inputTipoLancamento').value;
     const vCorrida = parseFloat(document.getElementById('inputCorrida').value) || 0;
@@ -292,9 +293,28 @@ function salvarDados() {
     const agora = new Date();
     const dataHoraStr = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
 
+    // Rotina nativa de verificação de satélite
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                let coordenadasString = `${position.coords.latitude.toFixed(5)}, ${position.coords.longitude.toFixed(5)}`;
+                executarPersistenciaCorrida(tipo, nomeCliente, vEmprestimo, vCorrida, dataHoraStr, coordenadasString, whatsCliente);
+            },
+            (error) => {
+                // Se der erro de GPS desativado ou sem sinal, grava sem travar o caixa
+                executarPersistenciaCorrida(tipo, nomeCliente, vEmprestimo, vCorrida, dataHoraStr, "Não capturado", whatsCliente);
+            },
+            { enableHighAccuracy: true, timeout: 5000 }
+        );
+    } else {
+        executarPersistenciaCorrida(tipo, nomeCliente, vEmprestimo, vCorrida, dataHoraStr, "Não suportado", whatsCliente);
+    }
+}
+
+function executarPersistenciaCorrida(tipo, nomeCliente, vEmprestimo, vCorrida, dataHoraStr, gpsDados, whatsCliente) {
     const novaCorrida = {
         id: registros.length > 0 ? Math.max(...registros.map(r => r.id)) + 1 : 1, 
-        tipo: tipo, cliente: nomeCliente, emprestado: vEmprestimo, corrida: vCorrida, dataHora: dataHoraStr, gps: coordenadaAtual, whatsCliente: whatsCliente
+        tipo: tipo, cliente: nomeCliente, emprestado: vEmprestimo, corrida: vCorrida, dataHora: dataHoraStr, gps: gpsDados, whatsCliente: whatsCliente
     };
 
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
@@ -311,15 +331,17 @@ function salvarDados() {
     }
 }
 
-// Bloco modular corrigido das funções de Recibo, Notas e Relatório Dinâmico por Herança
+// INJEÇÃO DO GPS NO RECIBO: Coordenadas acopladas estritamente no encerramento dos textos
 function prepararDisparoReciboNativo(reg, whatsappSugerido) {
     let txtMensagem = "";
+    let localizacaoGps = reg.gps || "Não capturado";
+
     if (reg.tipo === 'credito') {
         const totalDevido = reg.corrida + (reg.emprestado * 1.20);
-        txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* ${reg.cliente.toUpperCase()}\n-----------------------------------------\n🔑 *Corrida:* R$ ${reg.corrida.toFixed(2).replace('.', ',')}\n💵 *Empréstimo:* R$ ${reg.emprestado.toFixed(2).replace('.', ',')}\n-----------------------------------------\n💰 *TOTAL EM ABERTO:* R$ ${totalDevido.toFixed(2).replace('.', ',')}\n\n_Sumário de cobrança ativo lançado._`;
+        txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* ${reg.cliente.toUpperCase()}\n-----------------------------------------\n🔑 *Corrida:* R$ ${reg.corrida.toFixed(2).replace('.', ',')}\n💵 *Empréstimo:* R$ ${reg.emprestado.toFixed(2).replace('.', ',')}\n-----------------------------------------\n💰 *TOTAL EM ABERTO:* R$ ${totalDevido.toFixed(2).replace('.', ',')}\n📍 *GPS REGISTRO:* ${localizacaoGps}\n-----------------------------------------\n\n_Sumário de cobrança ativo lançado._`;
     } else {
         let descCliente = reg.cliente && reg.cliente !== "Passageiro Avulso" ? reg.cliente.toUpperCase() : "PASSAGEIRO CORPORATIVO";
-        txtMensagem = `🧾 *NOTA FISCAL / RECIBO DE TÁXI - DRIVERFLUX*\n=========================================\n🏢 *PRESTADOR:* Serviço de Táxi DriverFlux\n🆔 *IDENTIFICAÇÃO:* Registro Oficial #${reg.id}\n📅 *DATA/HORA EMISSÃO:* ${reg.dataHora}\n=========================================\n👤 *PASSAGEIRO:* ${descCliente}\n🔑 *SERVIÇO:* Transporte de Passageiros / Tarifa Balcão\n-----------------------------------------\n💰 *VALOR DO RECIBO:* R$ ${reg.corrida.toFixed(2).replace('.', ',')}\n🟢 *STATUS:* TOTALMENTE QUITADO / PAGO\n=========================================\n\n_Comprovante válido para fins de auditoria empresarial._`;
+        txtMensagem = `🧾 *NOTA FISCAL / RECIBO DE TÁXI - DRIVERFLUX*\n=========================================\n🏢 *PRESTADOR:* Serviço de Táxi DriverFlux\n🆔 *IDENTIFICAÇÃO:* Registro Oficial #${reg.id}\n📅 *DATA/HORA EMISSÃO:* ${reg.dataHora}\n=========================================\n👤 *PASSAGEIRO:* ${descCliente}\n🔑 *SERVIÇO:* Transporte de Passageiros / Tarifa Balcão\n-----------------------------------------\n💰 *VALOR DO RECIBO:* R$ ${reg.corrida.toFixed(2).replace('.', ',')}\n🟢 *STATUS:* TOTALMENTE QUITADO / PAGO\n📍 *GPS EMBARQUE:* ${localizacaoGps}\n=========================================\n\n_Comprovante válido para fins de auditoria empresarial._`;
     }
 
     let confirmarEnvio = confirm(`📄 REVISÃO DO RECIBO:\n\n${txtMensagem.replace(/\*/g, '')}\n\nDeseja disparar este comprovante via WhatsApp?`);
@@ -376,6 +398,10 @@ function realizarLogin() {
             else { alert("❌ Senha incorreta!"); }
         } else { alert("❌ Usuário não cadastrado!"); }
     });
+}
+
+function efictuarLogout() {
+    efetuarLogout();
 }
 
 function efetuarLogout() {
@@ -482,7 +508,7 @@ function configurarDatalistsUI(nomesArray) { const unicos = [...new Set(nomesArr
 function alternarBarraConsulta() { const container = document.getElementById('containerPesquisa'); container.style.display = (container.style.display === 'block') ? 'none' : 'block'; if(container.style.display === 'block') document.getElementById('inputPesquisa').focus(); }
 function limparConsulta() { document.getElementById('inputPesquisa').value = ""; document.getElementById('fichaCliente').style.display = 'none'; filtroTexto = ""; renderizarTabela(); }
 function formatarMoeda(v) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-function garantirUsuariosBaseNoFirebase() { db.ref("usuarios").once("value", (snapshot) => { if (!snapshot.exists()) { db.ref("usuarios").set({ "master": { senha: "master123", tipo: "gerente" }, "andre": { senha: "123", tipo: "folguista" }, "pedro": { senha: "456", tipo: "efetivo" } }); } }); }
+function garantizarUsuariosBaseNoFirebase() { db.ref("usuarios").once("value", (snapshot) => { if (!snapshot.exists()) { db.ref("usuarios").set({ "master": { senha: "master123", tipo: "gerente" }, "andre": { senha: "123", tipo: "folguista" }, "pedro": { senha: "456", tipo: "efetivo" } }); } }); }
 function ajustarCamposPorModalidade() { const tipo = document.getElementById('inputTipoLancamento').value; document.getElementById('camposCreditoOpcionais').style.display = (tipo === 'credito') ? 'block' : 'none'; }
 function fecharModal() { document.getElementById('formModal').style.display = 'none'; }
 
@@ -506,7 +532,7 @@ function cadastrarNovoMotoristaMaster() {
     if (localStorage.getItem('driverflux_modo_demo') === 'true') { return alert("🔒 Cadastro de motoristas bloqueado no modo de demonstração."); }
     let novoUser = prompt("👤 Digite o IDENTIFICADOR do novo motorista (Tudo junto, minúsculo. Ex: carlos):"); if (!novoUser) return;
     novoUser = novoUser.trim().toLowerCase();
-    let novaSenha = prompt(`🔑 Digite a senha de acesso para o motorista [${novoUser}]:`); if (!novaSenha) return;
+    let novaSenha = prompt(`🔑 Digite a senha de acesso para o motorista [${novoUser}]:`); if (!novoUser) return;
     let tipoContrato = prompt("📋 Digite o tipo de contrato (Digite exatamente: efetivo ou folguista):", "efetivo"); if (!tipoContrato) return;
     tipoContrato = tipoContrato.trim().toLowerCase();
     iniciarFirebaseSeNecessario(); db.ref(`usuarios/${novoUser}`).set({ senha: novaSenha, tipo: tipoContrato }).then(() => { alert(`🚀 Motorista [${novoUser.toUpperCase()}] cadastrado com sucesso!`); inicializarMaster(); });
