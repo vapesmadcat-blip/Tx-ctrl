@@ -131,7 +131,7 @@
         </div>
 
         <div class="btn-grid-actions">
-            <button class="btn-incluir" id="btnMenuIncluir" onclick="abrirModalInsercao()">➕ Incluir Corrida</button>
+            <button class="btn-incluir" id="btnMenuIncluir" onclick="abrirModalEdicao(null)">➕ Incluir Corrida</button>
             <button class="btn-consultar" onclick="alternarBarraConsulta()">🔍 Clientes / Pgto</button>
             <button class="btn-totais" onclick="calcularTotais()">📊 Fechamento</button>
             <button class="btn-relatorio" onclick="gerarRelatorio()">📄 Relatório</button>
@@ -539,7 +539,7 @@
         }
     }
 
-    function emitirNotaFiscalWhatsApp(idCorrida) {
+    function emititNotaFiscalWhatsApp(idCorrida) {
         const reg = registros.find(r => r.id === idCorrida);
         if (!reg) return alert("Corrida não encontrada.");
 
@@ -573,7 +573,7 @@
             const descCliente = reg.tipo === 'credito' ? (reg.cliente || 'N/I') : 'Passageiro Balcão';
             const valorExibido = reg.tipo === 'credito' ? (reg.corrida + reg.emprestado) : reg.corrida;
             
-            let acoesHtml = `<button class="btn-nota" style="background:#10b981; color:white; padding:5px 8px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" onclick="emitirNotaFiscalWhatsApp(${reg.id})">🧾 Nota</button>`;
+            let acoesHtml = `<button class="btn-nota" style="background:#10b981; color:white; padding:5px 8px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" onclick="emititNotaFiscalWhatsApp(${reg.id})">🧾 Nota</button>`;
             if (localStorage.getItem('driverflux_modo_demo') !== 'true') {
                 acoesHtml += `<button class="btn-cancel" style="padding:5px 6px; font-size:11px;" onclick="abrirModalEdicao(${reg.id})">Editar</button>`;
             } else { acoesHtml += `🔒 Local`; }
@@ -685,7 +685,36 @@
     function garantirUsuariosBaseNoFirebase() { db.ref("usuarios").once("value", (snapshot) => { if (!snapshot.exists()) { db.ref("usuarios").set({ "master": { senha: "master123", tipo: "gerente" }, "andre": { senha: "123", tipo: "folguista" }, "pedro": { senha: "456", tipo: "efetivo" } }); } }); }
     function ajustarCamposPorModalidade() { const tipo = document.getElementById('inputTipoLancamento').value; document.getElementById('camposCreditoOpcionais').style.display = (tipo === 'credito') ? 'block' : 'none'; }
     function fecharModal() { document.getElementById('formModal').style.display = 'none'; }
-    function abrirModalEdicao(id) { if (localStorage.getItem('driverflux_modo_demo') === 'true') return; const reg = registros.find(r => r.id === id); if (!reg) return; document.getElementById('modalTitle').innerText = `Alterar Registro #${id}`; document.getElementById('editId').value = id; document.getElementById('inputTipoLancamento').value = reg.tipo || "normal"; document.getElementById('inputCorrida').value = reg.corrida; document.getElementById('inputCliente').value = reg.cliente || ""; document.getElementById('inputEmprestimo').value = reg.emprestado || 0; ajustarCamposPorModalidade(); document.getElementById('formModal').style.display = 'flex'; }
+    
+    // CORRIGIDO: Agora a trava diferencia Inclusão (id null) de Edição real
+    function abrirModalEdicao(id) { 
+        if (localStorage.getItem('driverflux_modo_demo') === 'true' && id !== null) {
+            alert("🔒 Edição de registros bloqueada no modo de demonstração.");
+            return;
+        }
+        
+        if (id === null) {
+            document.getElementById('modalTitle').innerText = `Lançar Corrida`;
+            document.getElementById('editId').value = "";
+            document.getElementById('inputTipoLancamento').value = "normal";
+            document.getElementById('inputCorrida').value = "";
+            document.getElementById('inputCliente').value = "";
+            document.getElementById('inputWhatsCliente').value = "";
+            document.getElementById('inputEmprestimo').value = 0;
+        } else {
+            const reg = registros.find(r => r.id === id); 
+            if (!reg) return;
+            document.getElementById('modalTitle').innerText = `Alterar Registro #${id}`;
+            document.getElementById('editId').value = id;
+            document.getElementById('inputTipoLancamento').value = reg.tipo || "normal";
+            document.getElementById('inputCorrida').value = reg.corrida;
+            document.getElementById('inputCliente').value = reg.cliente || "";
+            document.getElementById('inputEmprestimo').value = reg.emprestado || 0;
+        }
+        ajustarCamposPorModalidade(); 
+        document.getElementById('formModal').style.display = 'flex'; 
+    }
+    
     function inicializarMaster() { db.ref("usuarios").once("value", (snapshotUser) => { motoristasCadastroMaster = snapshotUser.val() || {}; db.ref("turnos_operacionais").on("value", (snapshot) => { const data = snapshot.val(); const select = document.getElementById('selectFiltroTurnoMaster'); select.innerHTML = '<option value="">-- Escolha um Turno --</option>'; turnosHistoricoMaster = {}; if (data) { Object.keys(data).forEach(motorista => { Object.keys(data[motorista]).forEach(turnoId => { const t = data[motorista][turnoId]; turnosHistoricoMaster[turnoId] = t; let mInfo = motoristasCadastroMaster[motorista]; let tContrato = (mInfo && mInfo.tipo) ? mInfo.tipo : (t.tipoContrato || "efetivo"); const opt = document.createElement('option'); opt.value = turnoId; const statusIcon = t.status === 'aberto' ? '🟢 (Ativo)' : '🔴 (Fechado)'; opt.innerText = `${statusIcon} ${t.motorista.toUpperCase()} [${tContrato.toUpperCase()}] | Início: ${t.abertura}`; select.appendChild(opt); }); }); } }); }); }
     function selecionarTurnoParaVerificacaoMaster() { const selectedId = document.getElementById('selectFiltroTurnoMaster').value; document.getElementById('cardTotais').style.display = 'none'; document.getElementById('cardRelatorio').style.display = 'none'; if (!selectedId) { registros = []; renderizarTabela(); document.getElementById('lblIdTurnoAtivo').innerText = "Turno: Nenhum selecionado"; return; } metadadosTurno = turnosHistoricoMaster[selectedId]; idTurnoAtivo = selectedId; let contratoLog = metadadosTurno.tipoContrato ? metadadosTurno.tipoContrato.toUpperCase() : "EFETIVO"; document.getElementById('lblIdTurnoAtivo').innerText = `Auditoria Turno: #${idTurnoAtivo.substring(1, 8).toUpperCase()} | Tipo: ${contractLog}`; db.ref(`corridas_por_turno/${selectedId}`).once("value", (snapshot) => { registros = []; const data = snapshot.val(); if (data) { Object.keys(data).forEach(k => { let item = data[k]; item.docId = k; registros.push(item); }); registros.sort((a, b) => a.id - b.id); } renderizarTabela(); }); }
 
