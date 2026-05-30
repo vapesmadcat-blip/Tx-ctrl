@@ -1,6 +1,6 @@
 /**
  * APP.JS - DriverFlux Oficial (Com Hodômetro, Cobrança de Fiado e Emissão de Recibo Corporativo)
- * Lógica de Negócio Completa com Atalhos de Teste e Disparo de WhatsApp Blindado para Android
+ * Lógica de Negócio Completa com Atalhos de Teste e Fluxo de Ativação Destravado
  */
 
 const firebaseConfig = {
@@ -41,16 +41,27 @@ function checarLicenciamento() {
     const statusLicenca = localStorage.getItem('driverflux_licenca_ativa');
     const usuarioSalvo = localStorage.getItem('driverflux_usuario_logado');
 
-    if (statusLicenca === 'true' && (usuarioSalvo || localStorage.getItem('driverflux_modo_demo') === 'true')) {
-        document.getElementById('telaAtivacao').style.display = 'none';
-        if (localStorage.getItem('driverflux_modo_demo') === 'true') {
-            document.getElementById('telaLogin').style.display = 'none';
-            usuarioLogado = "demo_local";
-            verificarStatusTurnoMotorista(); 
+    if (statusLicenca === 'true') {
+        // Se já está com licença e tem usuário ou modo demo, vai direto para as telas internas
+        if (usuarioSalvo || localStorage.getItem('driverflux_modo_demo') === 'true') {
+            document.getElementById('telaAtivacao').style.display = 'none';
+            if (localStorage.getItem('driverflux_modo_demo') === 'true') {
+                document.getElementById('telaLogin').style.display = 'none';
+                usuarioLogado = "demo_local";
+                verificarStatusTurnoMotorista(); 
+            } else {
+                verificarSessaoLogin();
+            }
         } else {
-            verificarSessaoLogin();
+            // Se está ativado mas deslogou, direciona direto para a tela de Login oficial
+            document.getElementById('telaAtivacao').style.display = 'none';
+            document.getElementById('telaLogin').style.display = 'block';
+            if(document.getElementById('conteudoApp')) document.getElementById('conteudoApp').style.display = 'none';
+            iniciarFirebaseSeNecessario();
+            garantirUsuariosBaseNoFirebase();
         }
     } else {
+        // Bloqueio preventivo inicial (Pede Contra-Senha)
         let desafio = localStorage.getItem('driverflux_codigo_desafio') || Math.floor(1000 + Math.random() * 9000).toString();
         localStorage.setItem('driverflux_codigo_desafio', desafio);
         document.getElementById('txtCodigoDesafio').innerText = desafio;
@@ -68,7 +79,7 @@ function verificarAtivacao() {
     const digitada = parseInt(inputVal, 10);
 
     if (digitada === 222) {
-        alert("🛠️ [Bancada] Forçando activation do MODO COMPLETO...");
+        alert("🛠️ [Bancada] Forçando ativação do MODO COMPLETO...");
         ativarVersãoCompletaDefinitiva();
         return;
     }
@@ -98,30 +109,47 @@ function verificarAtivacao() {
     }
 }
 
+// FLUXO DE REDIRECIONAMENTO CORRIGIDO: Avança direto para o painel de Login sem dar reload circular
+function activarVersaoCompletaDefinitiva() {
+    ativarVersãoCompletaDefinitiva();
+}
+
+function activarVersaoCompletaDefinitiva() {
+    ativarVersãoCompletaDefinitiva();
+}
+
 function ativarVersãoCompletaDefinitiva() {
     localStorage.setItem('driverflux_licenca_ativa', 'true');
     localStorage.setItem('driverflux_modo_demo', 'false');
     localStorage.setItem('driverflux_demo_ja_utilizada', 'true');
     
+    // Inicializa a nuvem imediatamente
     if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
     db = firebase.database();
 
     const caronaDemo = localStorage.getItem('driverflux_demo_reg');
     if (caronaDemo) {
-        const corridasParaMigrar = JSON.parse(caronaDemo);
-        if (corridasParaMigrar.length > 0) {
-            const migracaoRef = db.ref("corridas_por_turno/MIGRADO_DA_DEMO");
-            corridasParaMigrar.forEach(reg => {
-                migracaoRef.push({
-                    id: reg.id, tipo: reg.tipo, cliente: reg.cliente + " (Vindo da Demo)",
-                    emprestado: reg.emprestado || 0, corrida: reg.corrida, dataHora: reg.dataHora || "Data Demo", gps: null
+        try {
+            const corridasParaMigrar = JSON.parse(caronaDemo);
+            if (corridasParaMigrar && corridasParaMigrar.length > 0) {
+                const migracaoRef = db.ref("corridas_por_turno/MIGRADO_DA_DEMO");
+                corridasParaMigrar.forEach(reg => {
+                    migracaoRef.push({
+                        id: reg.id, tipo: reg.tipo, cliente: reg.cliente + " (Vindo da Demo)",
+                        emprestado: reg.emprestado || 0, corrida: reg.corrida, dataHora: reg.dataHora || "Data Demo", gps: null
+                    });
                 });
-            });
-            alert("📦 Sucesso! Corridas registradas na demo foram migradas para a nuvem!");
-        }
+                alert("📦 Sucesso! Corridas registradas na demo foram migradas para a nuvem!");
+            }
+        } catch(e) { console.error("Sem dados válidos para migrar"); }
     }
-    alert("🚀 Sistema COMPLETO liberado!");
-    location.reload(); 
+    
+    alert("🚀 Sistema COMPLETO liberado! Faça login com suas credenciais.");
+    
+    // Altera as telas de forma síncrona nos nós do DOM - Rompe o loop invisível
+    document.getElementById('telaAtivacao').style.display = 'none';
+    document.getElementById('telaLogin').style.display = 'block';
+    garantirUsuariosBaseNoFirebase();
 }
 
 function verificarSessaoLogin() {
@@ -373,7 +401,6 @@ function finalizarSalvamento(dados, whats) {
     if (dados.tipo === 'credito') { prepararDisparoReciboNativo(dados, whats); }
 }
 
-// CORREÇÃO CIRÚRGICA: Protocolo direto universal para pular bloqueios de iframe do WebView/Cordova
 function prepararDisparoReciboNativo(reg, whatsappSugerido) {
     let txtMensagem = "";
     let localizacaoGps = reg.gps || "Não capturado";
@@ -391,8 +418,6 @@ function prepararDisparoReciboNativo(reg, whatsappSugerido) {
     if (confirmarEnvio) {
         let destino = prompt("📱 Digite o WhatsApp de destino (Com DDD, apenas números):", whatsappSugerido || "51");
         if (!destino || destino === "51") return alert("⚠️ Operação cancelada. Número inválido.");
-        
-        // Protocolo universal direto do sistema operacional - Abre o app nativo instantaneamente
         let urlWhats = `whatsapp://send?phone=55${destino}&text=${encodeURIComponent(txtMensagem)}`;
         window.location.href = urlWhats;
     }
@@ -549,7 +574,7 @@ function cadastrarNovoMotoristaMaster() {
     db.ref(`usuarios/${user.toLowerCase()}`).set({ senha: pass, tipo: tipo.toLowerCase() }).then(() => alert("Motorista cadastrado!"));
 }
 
-function garantirUsuariosBaseNoFirebase() {
+function garantizarUsuariosBaseNoFirebase() {
     db.ref('usuarios/master').once('value').then(snap => {
         if (!snap.exists()) { db.ref('usuarios/master').set({ senha: '123', tipo: 'master' }); }
     });
