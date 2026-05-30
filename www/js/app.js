@@ -1,42 +1,110 @@
 /**
- * APP.JS - Lógica de Fluxo de Caixa Integrada com Amortizações e Créditos
+ * APP.JS - Sincronização via Firebase Realtime Database
  */
 
+// Suas credenciais oficiais geradas pelo console do Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyAY217DxZeZZMlg0ZpHYFvXoALrkd5zcPM",
+    authDomain: "driverflux.firebaseapp.com",
+    databaseURL: "https://driverflux-default-rtdb.firebaseio.com",
+    projectId: "driverflux",
+    storageBucket: "driverflux.firebasestorage.app",
+    messagingSenderId: "855577761510",
+    appId: "1:855577761510:web:7e4c0911921a5c18c34d27"
+};
+
+// Inicializa o ecossistema do Firebase no dispositivo
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.database();
+
 let registros = [];
-let pagamentos = []; // Guarda histórico de amortizações por cliente
-let contadorId = 1;
+let pagamentos = [];
 let coordenadaAtual = null;
 let filtroTexto = "";
 
-/**
- * Salva toda a estrutura do app de forma segura no dispositivo
- */
-function salvarNoStorage() {
-    localStorage.setItem('driverflux_registros', JSON.stringify(registros));
-    localStorage.setItem('driverflux_pagamentos', JSON.stringify(pagamentos));
-    localStorage.setItem('driverflux_contadorId', contadorId.toString());
+function gerarContraSenhaEsperada(codigoDesafio) {
+    return (parseInt(codigoDesafio) * 3) + 1234;
 }
 
-/**
- * Carrega registros e histórico de amortizações
- */
-function carregarDoStorage() {
-    const salvosReg = localStorage.getItem('driverflux_registros');
-    const salvosPag = localStorage.getItem('driverflux_pagamentos');
-    const ultimoId = localStorage.getItem('driverflux_contadorId');
+function checarLicenciamento() {
+    const ativado = localStorage.getItem('driverflux_licenca_ativa');
     
-    if (salvosReg) registros = JSON.parse(salvosReg);
-    if (salvosPag) pagamentos = JSON.parse(salvosPag);
-    if (ultimoId) {
-        contadorId = parseInt(ultimoId);
-    } else if (registros.length > 0) {
-        contadorId = Math.max(...registros.map(r => r.id)) + 1;
+    if (ativado === 'true') {
+        document.getElementById('telaAtivacao').style.display = 'none';
+        document.getElementById('conteudoApp').style.display = 'block';
+        inicializarAplicativo();
+    } else {
+        let codigoDesafio = localStorage.getItem('driverflux_codigo_desafio');
+        if (!codigoDesafio) {
+            codigoDesafio = Math.floor(1000 + Math.random() * 9000).toString();
+            localStorage.setItem('driverflux_codigo_desafio', codigoDesafio);
+        }
+        document.getElementById('txtCodigoDesafio').innerText = codigoDesafio;
+        document.getElementById('telaAtivacao').style.display = 'block';
+        document.getElementById('conteudoApp').style.display = 'none';
+    }
+}
+
+function verificarAtivacao() {
+    const codigoDesafio = localStorage.getItem('driverflux_codigo_desafio');
+    const contraSenhaDigitada = parseInt(document.getElementById('inputContraSenha').value);
+    
+    if (!contraSenhaDigitada) {
+        alert("⚠️ Digite a contra-senha fornecida pelo administrador.");
+        return;
+    }
+
+    if (contraSenhaDigitada === gerarContraSenhaEsperada(codigoDesafio)) {
+        localStorage.setItem('driverflux_licenca_ativa', 'true');
+        alert("🚀 Aplicativo liberado com sucesso!");
+        checarLicenciamento();
+    } else {
+        alert("❌ Contra-senha incorreta!");
     }
 }
 
 /**
- * Popula todas as tags Datalist de busca por clientes
+ * Escuta em tempo real os nós do Realtime Database
  */
+function escutarDadosNuvem() {
+    // Sincroniza lançamentos de corridas
+    db.ref("registros").on("value", (snapshot) => {
+        registros = [];
+        const data = snapshot.val();
+        if (data) {
+            Object.keys(data).forEach((key) => {
+                let item = data[key];
+                item.docId = key; // Guarda a chave única gerada pelo Firebase para edições
+                registros.push(item);
+            });
+            // Ordena pelo ID numérico interno para manter consistência na tabela
+            registros.sort((a, b) => a.id - b.id);
+        }
+        renderizarTabela();
+        atualizarListaSugestoes();
+    }, (error) => {
+        console.error("Erro ao ler registros: ", error);
+    });
+
+    // Sincroniza livro de pagamentos/amortizações
+    db.ref("pagamentos").on("value", (snapshot) => {
+        pagamentos = [];
+        const data = snapshot.val();
+        if (data) {
+            Object.keys(data).forEach((key) => {
+                pagamentos.push(data[key]);
+            });
+        }
+        if (document.getElementById('containerPesquisa').style.display === 'block') {
+            processarConsultaCliente();
+        }
+    }, (error) => {
+        console.error("Erro ao ler pagamentos: ", error);
+    });
+}
+
 function atualizarListaSugestoes() {
     const listas = ['listaClientes', 'listaClientesConsulta'];
     const unicos = [...new Set(registros.map(r => r.cliente ? r.cliente.trim() : '').filter(n => n.length > 0))];
@@ -68,14 +136,14 @@ function abrirModalInsercao() {
     
     atualizarListaSugestoes();
     const gpsDisplay = document.getElementById('gpsStatus');
-    gpsDisplay.innerText = "🔍 Localizando satélites...";
+    gpsDisplay.innerText = "🔍 Buscando satélites...";
     gpsDisplay.style.color = '#ef4444';
     document.getElementById('formModal').style.display = 'flex';
 
     GeoLocation.capturarCoordenadas(
         function(lat, lng, accuracy) {
             coordenadaAtual = { latitude: lat, longitude: lng, accuracy: accuracy };
-            gpsDisplay.innerText = `✅ Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+            gpsDisplay.innerText = `✅ ${GeoLocation.formatarCoordenadas()}`;
             gpsDisplay.style.color = '#10b981';
         },
         function(erro) {
@@ -100,7 +168,8 @@ function abrirModalEdicao(id) {
     
     if (reg.gps) {
         coordenadaAtual = reg.gps;
-        gpsDisplay.innerText = `📍 Lat: ${reg.gps.latitude.toFixed(5)}, Lng: ${reg.gps.longitude.toFixed(5)}`;
+        GeoLocation.coordenadas = reg.gps;
+        gpsDisplay.innerText = `📍 ${GeoLocation.formatarCoordenadas()}`;
         gpsDisplay.style.color = '#4f46e5';
     } else {
         gpsDisplay.innerText = '⚠️ Sem localização guardada';
@@ -130,36 +199,37 @@ function salvarDados() {
 
     if (idEdit) {
         const reg = registros.find(r => r.id === parseInt(idEdit));
-        if (reg) {
-            reg.cliente = nomeCliente;
-            reg.emprestado = vEmprestimo;
-            reg.corrida = vCorrida;
-            reg.dataHora = dataHoraStr;
-            if (coordenadaAtual) reg.gps = coordenadaAtual;
+        if (reg && reg.docId) {
+            db.ref("registros/" + reg.docId).update({
+                cliente: nomeCliente,
+                emprestado: vEmprestimo,
+                corrida: vCorrida,
+                dataHora: dataHoraStr,
+                gps: coordenadaAtual ? coordenadaAtual : (reg.gps || null)
+            }).then(() => fecharModal())
+              .catch(e => alert("Erro ao atualizar na nuvem: " + e));
         }
     } else {
-        registros.push({
-            id: contadorId++,
+        let proximoId = 1;
+        if (registros.length > 0) {
+            proximoId = Math.max(...registros.map(r => r.id)) + 1;
+        }
+
+        db.ref("registros").push({
+            id: proximoId,
             cliente: nomeCliente,
             emprestado: vEmprestimo,
             corrida: vCorrida,
             dataHora: dataHoraStr,
             gps: coordenadaAtual
-        });
+        }).then(() => fecharModal())
+          .catch(e => alert("Erro ao salvar na nuvem: " + e));
     }
 
-    salvarNoStorage();
-    fecharModal();
-    renderizarTabela();
-    atualizarListaSugestoes();
-    limparConsulta();
     document.getElementById('cardTotais').style.display = 'none';
     document.getElementById('cardRelatorio').style.display = 'none';
 }
 
-/**
- * Exibe/Esconde painel de Consulta por cliente e Amortização
- */
 function alternarBarraConsulta() {
     const container = document.getElementById('containerPesquisa');
     if (container.style.display === 'block') {
@@ -179,20 +249,16 @@ function limparConsulta() {
     renderizarTabela();
 }
 
-/**
- * Processa a ficha financeira quando digita ou escolhe um cliente na lista
- */
 function processarConsultaCliente() {
     const nomeBusca = document.getElementById('inputPesquisa').value.trim();
     filtroTexto = nomeBusca.toLowerCase();
-    renderizarTabela(); // Filtra a tabela principal em tempo real
+    renderizarTabela();
 
     if (!nomeBusca) {
         document.getElementById('fichaCliente').style.display = 'none';
         return;
     }
 
-    // Calcula os débitos acumulados do cliente (+ juros de 20% sobre empréstimos)
     let totalDevido = 0;
     registros.forEach(r => {
         if (r.cliente && r.cliente.trim().toLowerCase() === nomeBusca.toLowerCase()) {
@@ -200,7 +266,6 @@ function processarConsultaCliente() {
         }
     });
 
-    // Calcula tudo o que esse cliente já pagou até hoje
     let totalPago = 0;
     pagamentos.forEach(p => {
         if (p.cliente.toLowerCase() === nomeBusca.toLowerCase()) {
@@ -208,7 +273,6 @@ function processarConsultaCliente() {
         }
     });
 
-    // Calcula o saldo líquido final (Abate ou gera Crédito)
     let saldoFinal = totalDevido - totalPago;
 
     document.getElementById('ledgerNomeCliente').innerText = `Extrato: ${nomeBusca}`;
@@ -216,7 +280,6 @@ function processarConsultaCliente() {
     document.getElementById('ledgerTotalPago').innerText = formatarMoeda(totalPago);
     
     const labelSaldo = document.getElementById('ledgerSaldoFinal');
-    const linhaSaldo = document.getElementById('ledgerLinhaSaldo');
     
     if (saldoFinal > 0) {
         labelSaldo.innerText = `${formatarMoeda(saldoFinal)} (Em aberto)`;
@@ -232,9 +295,6 @@ function processarConsultaCliente() {
     document.getElementById('fichaCliente').style.display = 'block';
 }
 
-/**
- * Executa a inserção do pagamento, realizando o abatimento ou acumulando crédito
- */
 function registrarPagamento() {
     const nomeCliente = document.getElementById('inputPesquisa').value.trim();
     const valorEntrega = parseFloat(document.getElementById('inputValorPagamento').value) || 0;
@@ -242,17 +302,14 @@ function registrarPagamento() {
     if (!nomeCliente) return alert("⚠️ Selecione um cliente válido primeiro.");
     if (valorEntrega <= 0) return alert("⚠️ Informe um valor de pagamento maior que zero.");
 
-    // Adiciona ao livro de caixa de pagamentos
-    pagamentos.push({
+    db.ref("pagamentos").push({
         cliente: nomeCliente,
         valor: valorEntrega,
         data: new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})
-    });
-
-    salvarNoStorage();
-    document.getElementById('inputValorPagamento').value = "";
-    alert(`✅ Pagamento de ${formatarMoeda(valorEntrega)} registrado com sucesso para ${nomeCliente}!`);
-    processarConsultaCliente(); // Recalcula a ficha na tela
+    }).then(() => {
+        document.getElementById('inputValorPagamento').value = "";
+        alert(`✅ Pagamento de ${formatarMoeda(valorEntrega)} sincronizado com a nuvem!`);
+    }).catch(e => alert("Erro ao computar pagamento cloud: " + e));
 }
 
 function renderizarTabela() {
@@ -296,7 +353,7 @@ function gerarRelatorio() {
     if (registros.length === 0) return alert("⚠️ Sem dados disponíveis.");
 
     let tBruto = 0, tCorridas = 0;
-    let txt = `🧾 DRIVERFLUX - RELATÓRIO COM HISTÓRICO DE QUITAÇÃO\n`;
+    let txt = `🧾 DRIVERFLUX - RELATÓRIO OPERACIONAL COM CLOUD\n`;
     txt += `Emitido em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}\n`;
     txt += `=========================================\n\n`;
 
@@ -331,8 +388,11 @@ function gerarRelatorio() {
     document.getElementById('cardRelatorio').style.display = 'block';
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+function inicializarAplicativo() {
     if (typeof GeoLocation !== 'undefined') GeoLocation.init();
-    carregarDoStorage();
-    renderizarTabela();
+    escutarDadosNuvem(); 
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    checarLicenciamento();
 });
