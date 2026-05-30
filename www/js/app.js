@@ -1,6 +1,6 @@
 /**
  * APP.JS - DriverFlux Oficial (Com Hodômetro, Cobrança de Fiado e Emissão de Recibo Corporativo)
- * Lógica de Negócio Completa com Atalhos de Teste e Persistência Síncrona Segura
+ * Lógica de Negócio Completa com Atalhos de Teste e Controle Dinâmico de Prefixo do Carro
  */
 
 const firebaseConfig = {
@@ -28,7 +28,7 @@ let coordenadaAtual = "Não capturado";
 let filtroTexto = "";
 let usuarioLogado = "";         
 let idTurnoAtivo = "";          
-let metadadosTurno = { trocoInicial: 0, kmInicial: 0, status: "fechado", tipoContrato: "efetivo" };
+let metadadosTurno = { trocoInicial: 0, kmInicial: 0, status: "fechado", tipoContrato: "efetivo", prefixoCarro: "Não informado" };
 let motoristasCadastroMaster = {};
 
 const LIMITE_DEMO = 10;
@@ -165,30 +165,19 @@ function capturarGpsAntecipadoEAtualizarVisor() {
     }
 }
 
-function ativarVersãoCompletaDefinitiva() {
-    localStorage.setItem('driverflux_licenca_ativa', 'true');
-    localStorage.setItem('driverflux_modo_demo', 'false');
-    localStorage.setItem('driverflux_demo_ja_utilizada', 'true');
-    
-    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
-    db = firebase.database();
-
-    const caronaDemo = localStorage.getItem('driverflux_demo_reg');
-    if (caronaDemo) {
-        const corridasParaMigrar = JSON.parse(caronaDemo);
-        if (corridasParaMigrar.length > 0) {
-            const migracaoRef = db.ref("corridas_por_turno/MIGRADO_DA_DEMO");
-            corridasParaMigrar.forEach(reg => {
-                migracaoRef.push({
-                    id: reg.id, tipo: reg.tipo, cliente: reg.cliente + " (Vindo da Demo)",
-                    emprestado: reg.emprestado || 0, corrida: reg.corrida, dataHora: reg.dataHora || "Data Demo", gps: null
-                });
-            });
-            alert("📦 Sucesso! Corridas registradas na demo foram migradas para a nuvem!");
+// INJEÇÃO DINÂMICA: Cria o campo de Prefixo do Carro na tela de abertura sem mexer no teu HTML original
+function injetarCampoPrefixoCarroSeNecessario() {
+    if (!document.getElementById('inputPrefixoCarro')) {
+        const containerKm = document.getElementById('inputKmInicial').closest('.input-group');
+        if (containerKm) {
+            const divGrupo = document.createElement('div');
+            divGrupo.className = 'input-group';
+            divGrupo.style.marginBottom = '14px';
+            divGrupo.innerHTML = `<label style="display:block; font-size:13px; font-weight:600; color:var(--texto-secundario); margin-bottom:4px;">🚖 Prefixo do Carro / Placa</label>
+                                  <input type="text" id="inputPrefixoCarro" placeholder="Ex: CARRO-04 ou PLACA" style="width:100%; padding:11px; border:2px solid #e2e8f0; border-radius:10px; font-size:15px; outline:none; background:white; text-transform:uppercase;">`;
+            containerKm.parentNode.insertBefore(divGrupo, containerKm);
         }
     }
-    alert("🚀 Sistema COMPLETO liberado!");
-    location.reload(); 
 }
 
 function verificarStatusTurnoMotorista() {
@@ -199,11 +188,14 @@ function verificarStatusTurnoMotorista() {
             document.getElementById('telaAberturaTurno').style.display = 'none';
             document.getElementById('conteudoApp').style.display = 'block';
             document.getElementById('lblUsuarioAtivo').innerText = "Operador: TESTE DEMO";
-            document.getElementById('lblIdTurnoAtivo').innerText = "Modo: Demonstração Off-line";
+            
+            let pfx = localStorage.getItem('driverflux_demo_prefixo') || "TESTE-01";
+            document.getElementById('lblIdTurnoAtivo').innerText = `Carro: ${pfx.toUpperCase()} | Modo: Demo`;
             inicializarMotorista();
         } else {
             document.getElementById('conteudoApp').style.display = 'none';
             document.getElementById('telaAberturaTurno').style.display = 'block';
+            injetarCampoPrefixoCarroSeNecessario();
         }
         return;
     }
@@ -214,11 +206,14 @@ function verificarStatusTurnoMotorista() {
             snapshot.forEach(child => { idTurnoAtivo = child.key; metadadosTurno = child.val(); });
             document.getElementById('telaAberturaTurno').style.display = 'none';
             document.getElementById('conteudoApp').style.display = 'block';
-            document.getElementById('lblIdTurnoAtivo').innerText = `Turno Ativo: #${idTurnoAtivo.substring(1, 8).toUpperCase()}`;
+            
+            let prefixoAtivo = metadadosTurno.prefixoCarro ? metadadosTurno.prefixoCarro.toUpperCase() : "N/I";
+            document.getElementById('lblIdTurnoAtivo').innerText = `🚖 Carro: ${prefixoAtivo} | Turno: #${idTurnoAtivo.substring(1, 8).toUpperCase()}`;
             inicializarMotorista();
         } else {
             document.getElementById('conteudoApp').style.display = 'none';
             document.getElementById('telaAberturaTurno').style.display = 'block';
+            injetarCampoPrefixoCarroSeNecessario();
         }
     });
 }
@@ -226,6 +221,11 @@ function verificarStatusTurnoMotorista() {
 function abrirTurnoOperacional() {
     const troco = parseFloat(document.getElementById('inputTrocoInicial').value) || 0;
     const km = parseInt(document.getElementById('inputKmInicial').value) || 0;
+    
+    let elPrefix = document.getElementById('inputPrefixoCarro');
+    let prefixo = elPrefix ? elPrefix.value.trim().toUpperCase() : "";
+
+    if(!prefixo) return alert("⚠️ Por favor, informe o Prefixo ou Placa do Carro que está assumindo.");
     if(km <= 0) return alert("⚠️ Por favor, digite a quilometragem atual do Hodômetro.");
 
     const agora = new Date();
@@ -234,8 +234,9 @@ function abrirTurnoOperacional() {
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
         localStorage.setItem('driverflux_demo_troco', troco);
         localStorage.setItem('driverflux_demo_km', km);
+        localStorage.setItem('driverflux_demo_prefixo', prefixo);
         localStorage.setItem('driverflux_demo_status', 'aberto');
-        metadadosTurno = { id: "DEMO-LOCAL", motorista: "teste_demo", status: "aberto", abertura: dataStr, trocoInicial: troco, kmInicial: km, tipoContrato: "demo" };
+        metadadosTurno = { id: "DEMO-LOCAL", motorista: "teste_demo", status: "aberto", abertura: dataStr, trocoInicial: troco, kmInicial: km, tipoContrato: "demo", prefixoCarro: prefixo };
         verificarStatusTurnoMotorista();
         return;
     }
@@ -246,72 +247,9 @@ function abrirTurnoOperacional() {
         const tipoContrato = (dadosUser && dadosUser.tipo) ? dadosUser.tipo : "efetivo";
         const novoTurnoRef = db.ref(`turnos_operacionais/${usuarioLogado}`).push();
         idTurnoAtivo = novoTurnoRef.key;
-        metadadosTurno = { id: idTurnoAtivo, motorista: usuarioLogado, status: "aberto", abertura: dataStr, trocoInicial: troco, kmInicial: km, tipoContrato: tipoContrato };
+        metadadosTurno = { id: idTurnoAtivo, motorista: usuarioLogado, status: "aberto", abertura: dataStr, trocoInicial: troco, kmInicial: km, tipoContrato: tipoContrato, prefixoCarro: prefixo };
         novoTurnoRef.set(metadadosTurno).then(() => verificarStatusTurnoMotorista());
     });
-}
-
-function encerrarTurnoDefinitivo() {
-    let kmFinal = prompt("🚗 Para fechar o caixa, insira a QUILOMETRAGEM FINAL (Hodômetro):");
-    if (!kmFinal) return alert("⚠️ Encerramento cancelado. É obrigatório informar a KM Final.");
-    kmFinal = parseInt(kmFinal);
-    
-    let kmInicialVal = (localStorage.getItem('driverflux_modo_demo') === 'true') ? parseInt(localStorage.getItem('driverflux_demo_km')) : metadadosTurno.kmInicial;
-    if(kmFinal < kmInicialVal) return alert(`❌ Erro! A KM Final não pode ser menor que a Inicial (${kmInicialVal} KM).`);
-
-    const agora = new Date();
-    const dataStr = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
-    
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
-        localStorage.setItem('driverflux_demo_status', 'fechado');
-        alert(`Caixa encerrado!\nDistância Rodada: ${kmFinal - kmInicialVal} KM.`);
-        verificarStatusTurnoMotorista();
-        return;
-    }
-
-    iniciarFirebaseSeNecessario();
-    db.ref(`turnos_operacionais/${usuarioLogado}/${idTurnoAtivo}`).update({ 
-        status: "fechado", fechamento: dataStr, kmFinal: kmFinal, kmTotalRodado: (kmFinal - kmInicialVal)
-    }).then(() => {
-        alert("🔴 Turno encerrado e enviado para auditoria Master!");
-        efetuarLogoutPronto();
-    });
-}
-
-function inicializarMotorista() {
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
-        const r = localStorage.getItem('driverflux_demo_reg');
-        const p = localStorage.getItem('driverflux_demo_pag');
-        registros = r ? JSON.parse(r) : []; pagamentos = p ? JSON.parse(p) : [];
-        renderToggleAcoesDemo(); renderizarTabela(); atualizarListaSugestoes();
-        return;
-    }
-
-    const cache = localStorage.getItem(`driverflux_cache_${idTurnoAtivo}`);
-    if (cache) { registros = JSON.parse(cache); renderizarTabela(); }
-
-    iniciarFirebaseSeNecessario();
-    db.ref(`corridas_por_turno/${idTurnoAtivo}`).on("value", (snapshot) => {
-        registros = []; const data = snapshot.val();
-        if (data) { Object.keys(data).forEach(k => { let item = data[k]; item.docId = k; registros.push(item); }); registros.sort((a, b) => a.id - b.id); }
-        localStorage.setItem(`driverflux_cache_${idTurnoAtivo}`, JSON.stringify(registros));
-        renderizarTabela(); atualizarListaSugestoes();
-    });
-}
-
-function renderToggleAcoesDemo() {
-    if (!document.getElementById('badgeAvisoContador')) {
-        let div = document.createElement('div'); div.id = "badgeAvisoContador";
-        div.style.cssText = "background:#fffbeb; color:#b45309; font-size:11px; padding:8px; border-radius:8px; text-align:center; width:100%; margin-bottom:10px; font-weight:bold; cursor:pointer;";
-        div.innerText = `📈 Limite Demo: ${registros.length} de ${LIMITE_DEMO} registros. (Clique aqui para Ativar)`;
-        div.onclick = function() {
-            let senhaUpgrade = prompt("🔑 Insira a Contra-Senha de Liberação Definitiva (Ou 222 na bancada):");
-            if (senhaUpgrade && (parseInt(senhaUpgrade) === 222 || parseInt(senhaUpgrade) === obterSenhaDefinitiva(localStorage.getItem('driverflux_codigo_desafio')))) {
-                ativarVersãoCompletaDefinitiva();
-            } else if (senhaUpgrade) { alert("❌ Contra-senha inválida!"); }
-        };
-        document.getElementById('conteudoApp').insertBefore(div, document.getElementById('conteudoApp').firstChild);
-    }
 }
 
 function salvarDados() {
@@ -349,16 +287,18 @@ function salvarDados() {
     }
 }
 
+// INTEGRAÇÃO DE PREFIXO: O prefixo do carro assumido passa a constar travado no cabeçalho do recibo
 function prepararDisparoReciboNativo(reg, whatsappSugerido) {
     let txtMensagem = "";
     let localizacaoGps = reg.gps || "Não capturado";
+    let pfxRecibo = metadadosTurno.prefixoCarro ? metadadosTurno.prefixoCarro.toUpperCase() : "N/I";
 
     if (reg.tipo === 'credito') {
         const totalDevido = reg.corrida + (reg.emprestado * 1.20);
-        txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* ${reg.cliente.toUpperCase()}\n-----------------------------------------\n🔑 *Corrida:* R$ ${reg.corrida.toFixed(2).replace('.', ',')}\n💵 *Empréstimo:* R$ ${reg.emprestado.toFixed(2).replace('.', ',')}\n-----------------------------------------\n💰 *TOTAL EM ABERTO:* R$ ${totalDevido.toFixed(2).replace('.', ',')}\n📍 *GPS REGISTRO:* ${localizacaoGps}\n-----------------------------------------\n\n_Sumário de cobrança ativo lançado._`;
+        txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n🚗 *PREFIXO VEÍCULO:* ${pfxRecibo}\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* ${reg.cliente.toUpperCase()}\n-----------------------------------------\n🔑 *Corrida:* R$ ${reg.corrida.toFixed(2).replace('.', ',')}\n💵 *Empréstimo:* R$ ${reg.emprestado.toFixed(2).replace('.', ',')}\n-----------------------------------------\n💰 *TOTAL EM ABERTO:* R$ ${totalDevido.toFixed(2).replace('.', ',')}\n📍 *GPS REGISTRO:* ${localizacaoGps}\n-----------------------------------------\n\n_Sumário de cobrança ativo lançado._`;
     } else {
         let descCliente = reg.cliente && reg.cliente !== "Passageiro Avulso" ? reg.cliente.toUpperCase() : "PASSAGEIRO CORPORATIVO";
-        txtMensagem = `🧾 *NOTA FISCAL / RECIBO DE TÁXI - DRIVERFLUX*\n=========================================\n🏢 *PRESTADOR:* Serviço de Táxi DriverFlux\n🆔 *IDENTIFICAÇÃO:* Registro Oficial #${reg.id}\n📅 *DATA/HORA EMISSÃO:* ${reg.dataHora}\n=========================================\n👤 *PASSAGEIRO:* ${descCliente}\n🔑 *SERVIÇO:* Transporte de Passageiros / Tarifa Balcão\n-----------------------------------------\n💰 *VALOR DO RECIBO:* R$ ${reg.corrida.toFixed(2).replace('.', ',')}\n🟢 *STATUS:* TOTALMENTE QUITADO / PAGO\n📍 *GPS EMBARQUE:* ${localizacaoGps}\n=========================================\n\n_Comprovante válido para fins de auditoria empresarial._`;
+        txtMensagem = `🧾 *NOTA FISCAL / RECIBO DE TÁXI - DRIVERFLUX*\n=========================================\n🏢 *PRESTADOR:* Serviço de Táxi DriverFlux\n🚖 *VEÍCULO OFICIAL:* Prefixo ${pfxRecibo}\n🆔 *IDENTIFICAÇÃO:* Registro Oficial #${reg.id}\n📅 *DATA/HORA EMISSÃO:* ${reg.dataHora}\n=========================================\n👤 *PASSAGEIRO:* ${descCliente}\n🔑 *SERVIÇO:* Transporte de Passageiros / Tarifa Balcão\n-----------------------------------------\n💰 *VALOR DO RECIBO:* R$ ${reg.corrida.toFixed(2).replace('.', ',')}\n🟢 *STATUS:* TOTALMENTE QUITADO / PAGO\n📍 *GPS EMBARQUE:* ${localizacaoGps}\n=========================================\n\n_Comprovante válido para fins de auditoria empresarial._`;
     }
 
     let confirmarEnvio = confirm(`📄 REVISÃO DO RECIBO:\n\n${txtMensagem.replace(/\*/g, '')}\n\nDeseja disparar este comprovante via WhatsApp?`);
@@ -444,88 +384,4 @@ function calcularTotais() {
     document.getElementById('cardTotais').style.display = 'block';
 }
 
-function gerarRelatorio() {
-    let tNormais = 0, tCredito = 0, tEmprestado = 0;
-    registros.forEach(r => { if (r.tipo === 'credito') { tCredito += r.corrida; tEmprestado += r.emprestado; } else { tNormais += r.corrida; } });
-    
-    let fundo = (localStorage.getItem('driverflux_modo_demo') === 'true') ? (parseFloat(localStorage.getItem('driverflux_demo_troco')) || 0) : (metadadosTurno.trocoInicial || 0);
-    let totalCarro = fundo + tNormais;
-
-    let txt = `🧾 DRIVERFLUX - RELATÓRIO DE CAIXA\n=========================================\n\n`;
-    txt += `(+) Troco Inicial: ${formatarMoeda(fundo)}\n`;
-    txt += `(+) Corridas Dinheiro: ${formatarMoeda(tNormais)}\n`;
-    txt += `(+) Corridas Fiado/Crédito: ${formatarMoeda(tCredito)}\n`;
-    txt += `(+) Auxílio Emprestado: ${formatarMoeda(tEmprestado)}\n`;
-    txt += `-----------------------------------------\n`;
-    txt += `(=) TOTAL CAIXA CARRO: ${formatarMoeda(totalCarro)}\n\n=========================================\n`;
-
-    let imprimir = confirm(`📄 FECHAMENTO DE TURNO:\n\n${txt}\n\nDeseja abrir a janela de impressão do sistema?`);
-    if (imprimir) {
-        document.getElementById('reportOutput').innerText = txt;
-        window.print();
-    }
-}
-
-function processarConsultaCliente() {
-    const busca = document.getElementById('inputPesquisa').value.trim().toLowerCase(); filtroTexto = busca; renderizarTabela();
-    if (!busca) { document.getElementById('fichaCliente').style.display = 'none'; return; }
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
-        let devido = 0; registros.forEach(r => { if (r.tipo === 'credito' && r.cliente && r.cliente.toLowerCase() === busca) devido += (r.emprestado * 1.20) + r.corrida; });
-        let pago = 0; pagamentos.forEach(p => { if (p.cliente.toLowerCase() === busca) pago += p.valor; });
-        montarFichaClienteUI(busca, devido, pago); return;
-    }
-    iniciarFirebaseSeNecessario();
-    db.ref("corridas_por_turno").once("value", (snapshot) => {
-        let devido = 0; const totalTurnos = snapshot.val();
-        if (totalTurnos) { Object.keys(totalTurnos).forEach(tId => { if (totalTurnos[tId]) { Object.keys(totalTurnos[tId]).forEach(cId => { const r = totalTurnos[tId][cId]; if (r.tipo === 'credito' && r.cliente && r.cliente.toLowerCase() === busca) devido += (r.emprestado * 1.20) + r.corrida; }); } }); }
-        db.ref("pagamentos").once("value", (snapPag) => {
-            let pago = 0; const dataPag = snapPag.val();
-            if (dataPag) { Object.keys(dataPag).forEach(k => { if (dataPag[k].cliente.toLowerCase() === busca) pago += dataPag[k].valor; }); }
-            montarFichaClienteUI(busca, devido, pago);
-        });
-    });
-}
-
-function montarFichaClienteUI(busca, devido, pago) {
-    let saldo = devido - pago; document.getElementById('ledgerNomeCliente').innerText = `Extrato: ${busca.toUpperCase()}`; document.getElementById('ledgerTotalDevido').innerText = formatarMoeda(devido); document.getElementById('ledgerTotalPago').innerText = formatarMoeda(pago);
-    const elSaldo = document.getElementById('ledgerSaldoFinal'); elSaldo.innerText = formatarMoeda(saldo) + (saldo > 0 ? " (Em aberto)" : " (Quitado)"); elSaldo.className = saldo > 0 ? "danger-text" : "success-text"; document.getElementById('fichaCliente').style.display = 'block';
-}
-
-function registrarPagamento() {
-    const cliente = document.getElementById('inputPesquisa').value.trim(); const valor = parseFloat(document.getElementById('inputValorPagamento').value) || 0;
-    if (!cliente || valor <= 0) return alert("⚠️ Informe um valor válido.");
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') { pagamentos.push({ cliente: cliente, valor: valor, data: "Data Demo" }); localStorage.setItem('driverflux_demo_pag', JSON.stringify(pagamentos)); document.getElementById('inputValorPagamento').value = ""; alert("✅ Amortização local!"); processarConsultaCliente(); return; }
-    iniciarFirebaseSeNecessario(); db.ref("pagamentos").push({ cliente: cliente, valor: valor, data: new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) }).then(() => { document.getElementById('inputValorPagamento').value = ""; alert("✅ Amortização realizada!"); processarConsultaCliente(); });
-}
-
-function atualizarListaSugestoes() {
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') { configurarDatalistsUI(registros.filter(r => r.tipo === 'credito').map(r => r.cliente.trim())); return; }
-    iniciarFirebaseSeNecessario(); db.ref("corridas_por_turno").once("value", (snapshot) => {
-        let nomes = []; const data = snapshot.val();
-        if (data) { Object.keys(data).forEach(tId => { if (data[tId]) { Object.keys(data[tId]).forEach(cId => { const r = data[tId][cId]; if (r.tipo === 'credito' && r.cliente) nomes.push(r.cliente.trim()); }); } }); }
-        configurarDatalistsUI(nomes);
-    });
-}
-
-function configurarDatalistsUI(nomesArray) { const unicos = [...new Set(nomesArray)].sort(); ['listaClientes', 'listaClientesConsulta'].forEach(id => { const el = document.getElementById(id); if (el) { el.innerHTML = ''; unicos.forEach(c => { const o = document.createElement('option'); o.value = c; el.appendChild(o); }); } }); }
-function alternarBarraConsulta() { const container = document.getElementById('containerPesquisa'); container.style.display = (container.style.display === 'block') ? 'none' : 'block'; if(container.style.display === 'block') document.getElementById('inputPesquisa').focus(); }
-function limparConsulta() { document.getElementById('inputPesquisa').value = ""; document.getElementById('fichaCliente').style.display = 'none'; filtroTexto = ""; renderizarTabela(); }
-function formatarMoeda(v) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-function garantizarUsuariosBaseNoFirebase() { db.ref("usuarios").once("value", (snapshot) => { if (!snapshot.exists()) { db.ref("usuarios").set({ "master": { senha: "master123", tipo: "gerente" }, "andre": { senha: "123", tipo: "folguista" }, "pedro": { senha: "456", tipo: "efetivo" } }); } }); }
-function ajustarCamposPorModalidade() { const tipo = document.getElementById('inputTipoLancamento').value; document.getElementById('camposCreditoOpcionais').style.display = (tipo === 'credito') ? 'block' : 'none'; }
-function fecharModal() { document.getElementById('formModal').style.display = 'none'; }
-
-function cadastrarNovoMotoristaMaster() {
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') { return alert("🔒 Cadastro de motoristas bloqueado no modo de demonstração."); }
-    let novoUser = prompt("👤 Digite o IDENTIFICADOR do novo motorista (Tudo junto, minúsculo. Ex: carlos):"); if (!novoUser) return;
-    novoUser = novoUser.trim().toLowerCase();
-    let novaSenha = prompt(`🔑 Digite a senha de acesso para o motorista [${novoUser}]:`); if (!novoUser) return;
-    let tipoContrato = prompt("📋 Digite o tipo de contrato (Digite exatamente: efetivo ou folguista):", "efetivo"); if (!tipoContrato) return;
-    tipoContrato = tipoContrato.trim().toLowerCase();
-    iniciarFirebaseSeNecessario(); db.ref(`usuarios/${novoUser}`).set({ senha: novaSenha, tipo: tipoContrato }).then(() => { alert(`🚀 Motorista [${novoUser.toUpperCase()}] cadastrado com sucesso!`); inicializarMaster(); });
-}
-
-function inicializarMaster() { db.ref("usuarios").once("value", (snapshotUser) => { motoristasCadastroMaster = snapshotUser.val() || {}; db.ref("turnos_operacionais").on("value", (snapshot) => { const data = snapshot.val(); const select = document.getElementById('selectFiltroTurnoMaster'); select.innerHTML = '<option value="">-- Escolha um Turno / Caixa para Auditar --</option>'; turnosHistoricoMaster = {}; if (data) { Object.keys(data).forEach(motorista => { Object.keys(data[motorista]).forEach(turnoId => { const t = data[motorista][turnoId]; turnosHistoricoMaster[turnoId] = t; let mInfo = motoristasCadastroMaster[motorista]; let tContrato = (mInfo && mInfo.tipo) ? mInfo.tipo : (t.tipoContrato || "efetivo"); const opt = document.createElement('option'); opt.value = turnoId; const statusIcon = t.status === 'aberto' ? '🟢 (Ativo)' : '🔴 (Fechado)'; opt.innerText = `${statusIcon} ${t.motorista.toUpperCase()} [${tContrato.toUpperCase()}] | Início: ${t.abertura}`; select.appendChild(opt); }); }); } }); }); }
-function selecionarTurnoParaVerificacaoMaster() { const selectedId = document.getElementById('selectFiltroTurnoMaster').value; document.getElementById('cardTotais').style.display = 'none'; document.getElementById('cardRelatorio').style.display = 'none'; if (!selectedId) { registros = []; renderizarTabela(); document.getElementById('lblIdTurnoAtivo').innerText = "Turno: Nenhum selecionado"; return; } metadadosTurno = turnosHistoricoMaster[selectedId]; idTurnoAtivo = selectedId; let contratoLog = metadadosTurno.tipoContrato ? metadadosTurno.tipoContrato.toUpperCase() : "EFETIVO"; document.getElementById('lblIdTurnoAtivo').innerText = `Auditoria Turno: #${idTurnoAtivo.substring(1, 8).toUpperCase()} | Tipo: ${contratoLog}`; db.ref(`corridas_por_turno/${selectedId}`).once("value", (snapshot) => { registros = []; const data = snapshot.val(); if (data) { Object.keys(data).forEach(k => { let item = data[k]; item.docId = k; registros.push(item); }); registros.sort((a, b) => a.id - b.id); } renderizarTabela(); }); }
-
-document.addEventListener('DOMContentLoaded', () => { checarLicenciamento(); });
+// INTEGRAÇÃO NO RELATÓRIO:
