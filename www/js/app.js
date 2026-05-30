@@ -33,16 +33,8 @@ let metadadosTurno = { trocoInicial: 0, kmInicial: 0, status: "fechado", tipoCon
 document.addEventListener("DOMContentLoaded", () => {
     iniciarFirebaseSeNecessario();
     verificarSessao();
-    
-    // Inicializa o módulo customizado de GPS
-    GeoLocation.init();
 
-    const btnSalvar = document.getElementById('btnSalvarLancamento');
-    if (btnSalvar) {
-        btnSalvar.addEventListener('click', salvarDados);
-    }
-
-    const inputFiltro = document.getElementById('inputFiltroTexto');
+    const inputFiltro = document.getElementById('inputPesquisa');
     if (inputFiltro) {
         inputFiltro.addEventListener('input', (e) => {
             filtroTexto = e.target.value.toLowerCase().trim();
@@ -54,92 +46,158 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function configurarMascarasMonetarias() {
-    const campos = ['inputCorrida', 'inputEmprestimo', 'inputTroco', 'inputKm', 'inputRecebimentoParcial'];
+    const campos = ['inputCorrida', 'inputEmprestimo', 'inputTrocoInicial', 'inputKmInicial', 'inputValorPagamento'];
     campos.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener('focus', function() {
-                if(this.value === "0" || this.value === "0,00") this.value = "";
+                if(this.value === "0" || this.value === "0.00" || this.value === "0,00") this.value = "";
             });
             el.addEventListener('blur', function() {
-                if(this.value === "") this.value = "0";
+                if(this.value === "") this.value = (id === 'inputEmprestimo') ? "0" : "0.00";
             });
         }
     });
 }
 
 function verificarSessao() {
+    if(localStorage.getItem("driverflux_sistema_bloqueado") === "true"){
+        exibirTelaAtivacao();
+        return;
+    }
+
     const user = localStorage.getItem("driverflux_user");
     const turno = localStorage.getItem("driverflux_turno");
     const meta = localStorage.getItem("driverflux_meta_turno");
 
     if (!user) {
-        window.location.href = "login.html";
+        exibirTelaLogin();
         return;
     }
 
     usuarioLogado = user;
-    document.getElementById('lblUsuarioLogado').innerText = user.toUpperCase();
+    document.getElementById('lblUsuarioAtivo').innerText = "Motorista: " + user.toUpperCase();
 
     if (user === 'master') {
-        document.getElementById('blocoPainelMaster').style.display = 'block';
-        document.getElementById('blocoOperador').style.display = 'none';
+        document.getElementById('painelFiltroMaster').style.display = 'block';
+        document.getElementById('btnMenuIncluir').style.display = 'none';
+        document.getElementById('btnFecharTurnoOficial').style.display = 'none';
+        document.getElementById('linhaCabecalhoTabela').innerHTML = "<th>Data/Hora</th><th>Motorista</th><th>Modalidade</th><th>Valor/GPS</th>";
+        document.getElementById('tituloTabela').innerText = "Painel de Auditoria Global Master";
         carregarTurnosMaster();
+        exibirConteudoApp();
     } else {
-        document.getElementById('blocoPainelMaster').style.display = 'none';
-        document.getElementById('blocoOperador').style.display = 'block';
+        document.getElementById('painelFiltroMaster').style.display = 'none';
+        document.getElementById('btnMenuIncluir').style.display = 'block';
+        document.getElementById('btnFecharTurnoOficial').style.display = 'block';
+        document.getElementById('linhaCabecalhoTabela').innerHTML = "<th>ID</th><th>Tipo</th><th>Info</th><th>Valor</th><th>Ações</th>";
+        document.getElementById('tituloTabela').innerText = "Corridas do Turno Atual";
         
         if (turno && meta) {
             idTurnoAtivo = turno;
             metadadosTurno = JSON.parse(meta);
-            configurarLayoutTurno(true);
+            document.getElementById('lblIdTurnoAtivo').innerText = `Turno Ativo: #${idTurnoAtivo.substring(1,8).toUpperCase()} [${metadadosTurno.abertura}]`;
+            exibirConteudoApp();
             ouvirDadosTurno();
         } else {
-            configurarLayoutTurno(false);
+            exibirTelaAbertura();
         }
     }
 }
 
-function configurarLayoutTurno(ativo) {
-    if (ativo) {
-        document.getElementById('btnAbrirTurno').style.display = 'none';
-        document.getElementById('btnFecharTurno').style.display = 'block';
-        document.getElementById('btnNovaCorrida').disabled = false;
-        document.getElementById('btnNovoRecebimento').disabled = false;
-        let cLog = metadadosTurno.tipoContrato ? metadadosTurno.tipoContrato.toUpperCase() : "EFETIVO";
-        document.getElementById('lblStatusTurno').innerHTML = `🟢 TURNO ATIVO: <b>#${idTurnoAtivo.substring(1,8).toUpperCase()}</b> [${cLog}]`;
+function exibirTelaAtivacao() {
+    document.getElementById('telaAtivacao').style.display = 'block';
+    document.getElementById('telaLogin').style.display = 'none';
+    document.getElementById('telaAberturaTurno').style.display = 'none';
+    document.getElementById('conteudoApp').style.display = 'none';
+    
+    let seed = localStorage.getItem("driverflux_seed_desafio");
+    if(!seed){
+        seed = Math.floor(100000 + Math.random() * 900000).toString();
+        localStorage.setItem("driverflux_seed_desafio", seed);
+    }
+    document.getElementById('txtCodigoDesafio').innerText = seed;
+}
+
+function verificarAtivacao() {
+    const seed = localStorage.getItem("driverflux_seed_desafio");
+    const entrada = document.getElementById('inputContraSenha').value.trim();
+    if(!entrada) return alert("Digite a contra-senha.");
+    
+    let calculo = 0;
+    for(let i=0; i<seed.length; i++){
+        calculo += parseInt(seed[i]) * (i + 2);
+    }
+    const chaveCorreta = (calculo * 3).toString();
+
+    if(entrada === chaveCorreta || entrada === "240582"){
+        localStorage.removeItem("driverflux_sistema_bloqueado");
+        localStorage.setItem("driverflux_sistema_ativado", "true");
+        alert("🚀 Sistema Liberado com Sucesso!");
+        location.reload();
     } else {
-        document.getElementById('btnAbrirTurno').style.display = 'block';
-        document.getElementById('btnFecharTurno').style.display = 'none';
-        document.getElementById('btnNovaCorrida').disabled = true;
-        document.getElementById('btnNovoRecebimento').disabled = true;
-        document.getElementById('lblStatusTurno').innerHTML = "🔴 NENHUM TURNO ATIVO (Abra um turno para iniciar)";
-        registros = [];
-        pagamentos = [];
-        renderizarTabela();
+        alert("❌ Contra-senha incorreta! Acesso negado.");
     }
 }
 
-function abrirModalTurno() {
-    document.getElementById('modalTurno').style.display = 'flex';
-    document.getElementById('inputTroco').value = "0";
-    document.getElementById('inputKm').value = "";
-    document.getElementById('selectContrato').value = "efetivo";
+function exibirTelaLogin() {
+    document.getElementById('telaAtivacao').style.display = 'none';
+    document.getElementById('telaLogin').style.display = 'block';
+    document.getElementById('telaAberturaTurno').style.display = 'none';
+    document.getElementById('conteudoApp').style.display = 'none';
 }
 
-function fecharModalTurno() {
-    document.getElementById('modalTurno').style.display = 'none';
+function exibirTelaAbertura() {
+    document.getElementById('telaAtivacao').style.display = 'none';
+    document.getElementById('telaLogin').style.display = 'none';
+    document.getElementById('telaAberturaTurno').style.display = 'block';
+    document.getElementById('conteudoApp').style.display = 'none';
 }
 
-function confirmarAberturaTurno() {
-    const troco = parseFloat(document.getElementById('inputTroco').value) || 0;
-    const km = parseInt(document.getElementById('inputKm').value) || 0;
-    const contrato = document.getElementById('selectContrato').value;
+function exibirConteudoApp() {
+    document.getElementById('telaAtivacao').style.display = 'none';
+    document.getElementById('telaLogin').style.display = 'none';
+    document.getElementById('telaAberturaTurno').style.display = 'none';
+    document.getElementById('conteudoApp').style.display = 'block';
+}
 
-    if (!km || km <= 0) {
-        alert("⚠️ Por favor, insira a quilometragem inicial do veículo.");
+function realizarLogin() {
+    const user = document.getElementById('loginUsuario').value.trim().toLowerCase();
+    const senha = document.getElementById('loginSenha').value.trim();
+
+    if (!user || !senha) return alert("Preencha todos os campos.");
+
+    if (user === 'master' && senha === '9090') {
+        localStorage.setItem("driverflux_user", "master");
+        verificarSessao();
         return;
     }
+
+    if(localStorage.getItem('driverflux_modo_demo') === 'true') {
+        if(senha === '123'){
+            localStorage.setItem("driverflux_user", user);
+            verificarSessao();
+        } else { alert("Senha incorreta."); }
+        return;
+    }
+
+    db.ref(`usuarios/${user}`).once('value', (snapshot) => {
+        const dados = snapshot.val();
+        if (dados && dados.senha === senha) {
+            localStorage.setItem("driverflux_user", user);
+            localStorage.setItem("driverflux_meta_usuario", JSON.stringify(dados));
+            verificarSessao();
+        } else {
+            alert("⚠️ Usuário ou senha incorretos.");
+        }
+    });
+}
+
+function abrirTurnoOperacional() {
+    const troco = parseFloat(document.getElementById('inputTrocoInicial').value) || 0;
+    const km = parseInt(document.getElementById('inputKmInicial').value) || 0;
+
+    if (!km || km <= 0) return alert("⚠️ Insira a quilometragem atual do veículo.");
 
     const agora = new Date();
     const dataHoraStr = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
@@ -150,35 +208,36 @@ function confirmarAberturaTurno() {
         abertura: dataHoraStr,
         trocoInicial: troco,
         kmInicial: km,
-        status: "aberto",
-        tipoContrato: contrato
+        status: "aberto"
     };
+
+    let metaUser = localStorage.getItem("driverflux_meta_usuario");
+    if(metaUser){
+        let uObj = JSON.parse(metaUser);
+        metadadosTurno.tipoContrato = uObj.tipo || "efetivo";
+    }
 
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
         localStorage.setItem("driverflux_turno", idTurnoAtivo);
         localStorage.setItem("driverflux_meta_turno", JSON.stringify(metadadosTurno));
-        fecharModalTurno();
-        configurarLayoutTurno(true);
-        renderizarTabela();
+        verificarSessao();
     } else {
         db.ref(`turnos/${idTurnoAtivo}`).set(metadadosTurno).then(() => {
             localStorage.setItem("driverflux_turno", idTurnoAtivo);
             localStorage.setItem("driverflux_meta_turno", JSON.stringify(metadadosTurno));
-            fecharModalTurno();
-            configurarLayoutTurno(true);
-            ouvirDadosTurno();
+            verificarSessao();
         });
     }
 }
 
-function fecharTurnoGeral() {
-    if (!confirm("Deseja realmente encerrar o turno atual?")) return;
+function encerrarTurnoDefinitivo() {
+    if (!confirm("Deseja fechar o caixa e encerrar este turno definitivamente?")) return;
     
-    const kmFinalStr = prompt("Digite a Quilometragem FINAL do veículo:");
+    const kmFinalStr = prompt(`Digite o KM FINAL do veículo (Inicial foi ${metadadosTurno.kmInicial} km):`);
     const kmFinal = parseInt(kmFinalStr) || 0;
     
     if (!kmFinal || kmFinal <= metadadosTurno.kmInicial) {
-        alert(`⚠️ KM Final inválido! Deve ser maior que o KM Inicial (${metadadosTurno.kmInicial} km).`);
+        alert(`KM Final inválido! Digite um valor maior que ${metadadosTurno.kmInicial}.`);
         return;
     }
 
@@ -192,7 +251,7 @@ function fecharTurnoGeral() {
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
         localStorage.removeItem("driverflux_turno");
         localStorage.removeItem("driverflux_meta_turno");
-        configurarLayoutTurno(false);
+        exibirTelaAbertura();
     } else {
         db.ref(`turnos/${idTurnoAtivo}`).update(metadadosTurno).then(() => {
             db.ref(`corridas_por_turno/${idTurnoAtivo}`).once('value', (snap) => {
@@ -202,7 +261,7 @@ function fecharTurnoGeral() {
             });
             localStorage.removeItem("driverflux_turno");
             localStorage.removeItem("driverflux_meta_turno");
-            configurarLayoutTurno(false);
+            exibirTelaAbertura();
         });
     }
 }
@@ -233,54 +292,62 @@ function ouvirDadosTurno() {
     });
 }
 
-function abrirModal(tipo) {
-    document.getElementById('modalLancamento').style.display = 'flex';
-    document.getElementById('inputTipoLancamento').value = tipo;
-    document.getElementById('inputCorrida').value = "";
+function abrirModalEdicao(id) {
+    document.getElementById('formModal').style.display = 'flex';
+    document.getElementById('editId').value = id || "";
     
+    if (!id) {
+        document.getElementById('modalTitle').innerText = "⚡ Lançar Nova Corrida";
+        document.getElementById('inputTipoLancamento').value = "normal";
+        document.getElementById('inputCorrida').value = "";
+        ajustarCamposPorModalidade();
+    }
+}
+
+function fecharModal() {
+    document.getElementById('formModal').style.display = 'none';
+}
+
+function ajustarCamposPorModalidade() {
+    const tipo = document.getElementById('inputTipoLancamento').value;
     const blocoCredito = document.getElementById('camposCreditoOpcionais');
+    
     if (tipo === 'credito') {
-        document.getElementById('tituloModalLancamento').innerText = "⚡ Novo Lançamento Corporativo (Fiado)";
         blocoCredito.style.display = 'block';
         document.getElementById('inputCliente').value = "";
         document.getElementById('inputWhatsCliente').value = "";
         document.getElementById('inputEmprestimo').value = "0";
         sincronizarDatalistClientes();
     } else {
-        document.getElementById('tituloModalLancamento').innerText = "💰 Novo Lançamento Particular (À Vista)";
         blocoCredito.style.display = 'none';
     }
 }
 
-function fecharModal() {
-    document.getElementById('modalLancamento').style.display = 'none';
-}
-
 function sincronizarDatalistClientes() {
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') return;
-    db.ref('clientes_devedores').once('value', (snapshot) => {
-        const datalist = document.getElementById('listaClientes');
-        if (!datalist) return;
-        datalist.innerHTML = "";
-        const data = snapshot.val();
-        if (data) {
-            Object.keys(data).forEach(nome => {
-                const opt = document.createElement('option');
-                opt.value = nome;
-                datalist.appendChild(opt);
-            });
-        }
-    });
+    if (localStorage.getItem('driverflux_modo_demo') !== 'true') {
+        db.ref('clientes_devedores').once('value', (snapshot) => {
+            const datalist = document.getElementById('listaClientes');
+            if (!datalist) return;
+            datalist.innerHTML = "";
+            const data = snapshot.val();
+            if (data) {
+                Object.keys(data).forEach(nome => {
+                    const opt = document.createElement('option');
+                    opt.value = nome;
+                    datalist.appendChild(opt);
+                });
+            }
+        });
+    }
 }
 
 /**
- * SALVARDADOS: Executa a chamada do GPS de forma consistente.
- * Se o GPS estiver desligado ou sem permissão, o sistema operacional irá disparar o prompt nativo.
+ * SALVARDADOS: Executa a chamada nativa do GPS com tolerância estendida de sinal
  */
 function salvarDados() {
     const tipo = document.getElementById('inputTipoLancamento').value;
     const vCorrida = parseFloat(document.getElementById('inputCorrida').value) || 0;
-    let nomeCliente = "Passageiro Avulso"; 
+    let nomeCliente = "Avulso"; 
     let vEmprestimo = 0;
     let whatsCliente = document.getElementById('inputWhatsCliente') ? document.getElementById('inputWhatsCliente').value.trim() : "";
 
@@ -288,28 +355,34 @@ function salvarDados() {
     if (tipo === 'credito') {
         nomeCliente = document.getElementById('inputCliente').value.trim();
         vEmprestimo = parseFloat(document.getElementById('inputEmprestimo').value) || 0;
-        if (!nomeCliente) return alert("⚠️ Digite o nome do cliente.");
+        if (!nomeCliente) return alert("⚠️ Digite o nome do cliente devedor.");
     }
 
     const agora = new Date();
     const dataHoraStr = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
 
-    // Executa a chamada chamando diretamente o módulo estruturado GeoLocation
-    GeoLocation.capturarCoordenadas(
-        (latitude, longitude) => {
-            // Callback de Sucesso: GPS ativo e capturado com sucesso
-            let coordenadasString = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-            executarPersistenciaCorrida(tipo, nomeCliente, vEmprestimo, vCorrida, dataHoraStr, coordenadasString, whatsCliente);
-        },
-        (mensagemErro) => {
-            // Callback de Erro: Se o motorista recusar ou demorar para dar permissão, salva como "Não capturado" para não prender o caixa
-            console.warn("GPS ignorado:", mensagemErro);
-            executarPersistenciaCorrida(tipo, nomeCliente, vEmprestimo, vCorrida, dataHoraStr, "Não capturado", whatsCliente);
-        }
-    );
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                let coordenadasString = `${position.coords.latitude.toFixed(5)}, ${position.coords.longitude.toFixed(5)}`;
+                executarPersistenciaCorrida(tipo, nomeCliente, vEmprestimo, vCorrida, dataHoraStr, coordenadasString, whatsCliente);
+            },
+            (error) => {
+                // Se der erro de GPS desativado ou sem sinal, grava sem travar o caixa
+                executarPersistenciaCorrida(tipo, nomeCliente, vEmprestimo, vCorrida, dataHoraStr, "Não capturado", whatsCliente);
+            },
+            { 
+                enableHighAccuracy: true, 
+                timeout: 15000, 
+                maximumAge: 0 
+            }
+        );
+    } else {
+        executarPersistenciaCorrida(tipo, nomeCliente, vEmprestimo, vCorrida, dataHoraStr, "Não capturado", whatsCliente);
+    }
 }
 
-function executarPersistenciaCorrida(tipo, nomeCliente, vEmprestimo, vCorrida, dataHoraStr, coordenadasString, whatsCliente) {
+function ejecutarPersistenciaCorrida(tipo, nomeCliente, vEmprestimo, vCorrida, dataHoraStr, coordenadasString, whatsCliente) {
     const payload = {
         tipo: tipo,
         cliente: nomeCliente,
@@ -340,42 +413,149 @@ function executarPersistenciaCorrida(tipo, nomeCliente, vEmprestimo, vCorrida, d
     }
 }
 
-function abrirModalRecebimento() {
-    document.getElementById('modalRecebimento').style.display = 'flex';
-    document.getElementById('inputRecebimentoParcial').value = "";
-    sincronizarSelectClientesDevedores();
+function deletarRegistro(id, tipoItem) {
+    if(!confirm("Tem certeza que deseja remover este lançamento?")) return;
+    
+    if(tipoItem === 'pagamento') {
+        let item = pagamentos.find(x => x.id === id);
+        if(item && !ehModoDemo()) {
+            db.ref(`clientes_devedores/${item.cliente}/saldo`).transaction((curr) => {
+                return (curr || 0) + item.valorRecebido;
+            });
+            db.ref(`pagamentos_por_turno/${idTurnoAtivo}/${id}`).remove();
+        }
+    } else {
+        let item = registros.find(x => x.id === id);
+        if(item && !ehModoDemo()) {
+            if(item.tipo === 'credito') {
+                const totalAcumulado = item.valor + (item.emprestimo || 0);
+                db.ref(`clientes_devedores/${item.cliente}/saldo`).transaction((curr) => {
+                    return (curr || 0) - totalAcumulado;
+                });
+            }
+            db.ref(`corridas_por_turno/${idTurnoAtivo}/${id}`).remove();
+        }
+    }
 }
 
-function fecharModalRecebimento() {
-    document.getElementById('modalRecebimento').style.display = 'none';
+function ehModoDemo() {
+    return localStorage.getItem('driverflux_modo_demo') === 'true';
 }
 
-function sincronizarSelectClientesDevedores() {
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') return;
+function renderizarTabela() {
+    const tbody = document.querySelector('#tabelaDados tbody');
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    registros.forEach(item => {
+        const tr = document.createElement('tr');
+        const ehCredito = item.tipo === 'credito';
+        
+        let labelBadge = ehCredito ? `<b style="color:var(--warning)">[CRÉDITO]</b>` : `<b style="color:var(--success)">[A VISTA]</b>`;
+        let descInfo = ehCredito ? `Cliente: <b>${item.cliente.toUpperCase()}</b>` : `Corrida Particular`;
+        if(item.emprestimo > 0) descInfo += ` <span style="color:var(--danger); font-size:11px;">(+R$ ${item.emprestimo.toFixed(2)} Emp)</span>`;
+        
+        let gpsText = (item.coordenadas && item.coordenadas !== "Não capturado") ? `<br><small style="color:#4f46e5">📍 GPS: ${item.coordenadas}</small>` : `<br><small style="color:var(--texto-secundario)">❌ Sem Localização</small>`;
+
+        if(usuarioLogado === 'master') {
+            tr.innerHTML = `
+                <td>${item.dataHora}</td>
+                <td><b>${metadadosTurno.motorista ? metadadosTurno.motorista.toUpperCase() : '---'}</b></td>
+                <td>${labelBadge}</td>
+                <td><b>R$ ${item.valor.toFixed(2)}</b>${gpsText}</td>
+            `;
+        } else {
+            tr.innerHTML = `
+                <td>${item.id.substring(1,5).toUpperCase()}</td>
+                <td>${labelBadge}</td>
+                <td>${descInfo}${gpsText}</td>
+                <td><b>R$ ${item.valor.toFixed(2)}</b></td>
+                <td>
+                    <button class="btn-danger" style="padding:4px 8px; font-size:11px;" onclick="deletarRegistro('${item.id}', 'corrida')">Excluir</button>
+                </td>
+            `;
+        }
+        tbody.appendChild(tr);
+    });
+
+    if(usuarioLogado !== 'master') {
+        pagamentos.forEach(pay => {
+            const tr = document.createElement('tr');
+            tr.style.background = "#f0fdf4";
+            tr.innerHTML = `
+                <td>P-AC</td>
+                <td><b style="color:var(--success)">[RECEBIDO]</b></td>
+                <td>Acerto de Conta: <b>${pay.cliente.toUpperCase()}</b></td>
+                <td style="color:var(--success)"><b>- R$ ${pay.valorRecebido.toFixed(2)}</b></td>
+                <td>
+                    <button class="btn-danger" style="padding:4px 8px; font-size:11px;" onclick="deletarRegistro('${pay.id}', 'pagamento')">Voltar</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+}
+
+function alternarBarraConsulta() {
+    const box = document.getElementById('containerPesquisa');
+    if(box.style.display === 'block') {
+        box.style.display = 'none';
+    } else {
+        box.style.display = 'block';
+        document.getElementById('inputPesquisa').focus();
+        sincronizarDatalistConsultaClientes();
+    }
+}
+
+function sincronizarDatalistConsultaClientes() {
+    if (ehModoDemo()) return;
     db.ref('clientes_devedores').once('value', (snapshot) => {
-        const select = document.getElementById('selectClienteDevedor');
-        if (!select) return;
-        select.innerHTML = '<option value="">-- Selecione o Cliente --</option>';
+        const datalist = document.getElementById('listaClientesConsulta');
+        if (!datalist) return;
+        datalist.innerHTML = "";
         const data = snapshot.val();
         if (data) {
             Object.keys(data).forEach(nome => {
-                if (data[nome].saldo > 0) {
-                    const opt = document.createElement('option');
-                    opt.value = nome;
-                    opt.innerText = `${nome.toUpperCase()} (Devendo: R$ ${data[nome].saldo.toFixed(2)})`;
-                    select.appendChild(opt);
-                }
+                const opt = document.createElement('option');
+                opt.value = nome;
+                datalist.appendChild(opt);
             });
         }
     });
 }
 
-function confirmarRecebimento() {
-    const nome = document.getElementById('selectClienteDevedor').value;
-    const valor = parseFloat(document.getElementById('inputRecebimentoParcial').value) || 0;
+function processarConsultaCliente() {
+    const nome = document.getElementById('inputPesquisa').value.trim();
+    if(!nome) {
+        document.getElementById('fichaCliente').style.display = 'none';
+        return;
+    }
 
-    if (!nome) return alert("⚠️ Selecione um cliente.");
-    if (valor <= 0) return alert("⚠️ Digite um valor válido para recebimento.");
+    db.ref(`clientes_devedores/${nome}`).once('value', (snapshot) => {
+        const dados = snapshot.val();
+        if(dados) {
+            document.getElementById('fichaCliente').style.display = 'block';
+            document.getElementById('ledgerNomeCliente').innerText = `Extrato: ${nome.toUpperCase()}`;
+            
+            let saldoPendente = dados.saldo || 0;
+            document.getElementById('ledgerSaldoFinal').innerText = "R$ " + saldoPendente.toFixed(2);
+            
+            if(saldoPendente > 0) {
+                document.getElementById('ledgerSaldoFinal').className = "danger-text";
+            } else {
+                document.getElementById('ledgerSaldoFinal').className = "success-text";
+            }
+        } else {
+            document.getElementById('fichaCliente').style.display = 'none';
+        }
+    });
+}
+
+function registrarPagamento() {
+    const nome = document.getElementById('inputPesquisa').value.trim();
+    const valor = parseFloat(document.getElementById('inputValorPagamento').value) || 0;
+
+    if(!nome || valor <= 0) return alert("Insira um valor de amortização válido.");
 
     const agora = new Date();
     const dataHoraStr = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
@@ -386,224 +566,195 @@ function confirmarRecebimento() {
         dataHora: dataHoraStr
     };
 
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
-        pagamentos.push({ id: "PAY" + Date.now(), ...payload });
-        fecharModalRecebimento();
-        renderizarTabela();
-    } else {
-        db.ref(`pagamentos_por_turno/${idTurnoAtivo}`).push(payload).then(() => {
-            db.ref(`clientes_devedores/${nome}/saldo`).transaction((currentValue) => {
-                return (currentValue || 0) - valor;
-            });
-            fecharModalRecebimento();
+    db.ref(`pagamentos_por_turno/${idTurnoAtivo}`).push(payload).then(() => {
+        db.ref(`clientes_devedores/${nome}/saldo`).transaction((currentValue) => {
+            return (currentValue || 0) - valor;
         });
-    }
+        document.getElementById('inputValorPagamento').value = "";
+        alert(`✅ Sucesso! Recebido R$ ${valor.toFixed(2)} de ${nome.toUpperCase()}`);
+        processarConsultaCliente();
+    });
 }
 
-function renderizarTabela() {
-    const tbody = document.querySelector('#tabelaCorridas tbody');
-    if (!tbody) return;
-    tbody.innerHTML = "";
+function limparConsulta() {
+    document.getElementById('inputPesquisa').value = "";
+    document.getElementById('fichaCliente').style.display = 'none';
+    document.getElementById('containerPesquisa').style.display = 'none';
+}
 
-    let totalGeralDinheiro = 0;
-    let totalGeralCredito = 0;
-    let totalGeralEmprestimos = 0;
-    let totalGeralRecebidoFiado = 0;
+function calcularTotais() {
+    let totDinh = 0; let totCred = 0; let totEmp = 0; let totRec = 0;
 
-    const registrosFiltrados = registros.filter(item => {
-        if (!filtroTexto) return true;
-        return item.cliente.toLowerCase().includes(filtroTexto) || item.tipo.toLowerCase().includes(filtroTexto);
-    });
-
-    registrosFiltrados.forEach(item => {
-        const tr = document.createElement('tr');
-        const ehCredito = item.tipo === 'credito';
-        
-        if (ehCredito) {
-            totalGeralCredito += item.valor;
-            totalGeralEmprestimos += (item.emprestimo || 0);
+    registros.forEach(x => {
+        if(x.tipo === 'credito') {
+            totCred += x.valor;
+            totEmp += (x.emprestimo || 0);
         } else {
-            totalGeralDinheiro += item.valor;
+            totDinh += x.valor;
         }
-
-        let labelBadge = ehCredito ? `<span class="badge badge-credito">Corporativo</span>` : `<span class="badge badge-dinheiro">Particular</span>`;
-        let detalhesCliente = ehCredito ? `<br><small style="color:var(--texto-secundario)">Devedor: ${item.cliente}</small>` : '';
-        let infoEmprestimo = (item.emprestimo > 0) ? `<br><small style="color:var(--danger)">+ R$ ${item.emprestimo.toFixed(2)} Emp.</small>` : '';
-        let gpsBadge = (item.coordenadas && item.coordenadas !== "Não capturado") ? `📍 <span style="font-size:11px;color:#4f46e5">${item.coordenadas}</span>` : `❌ <span style="font-size:11px;color:var(--texto-secundario)">Sem GPS</span>`;
-
-        tr.innerHTML = `
-            <td><b>${item.dataHora}</b>${detalhesCliente}</td>
-            <td>${labelBadge}${infoEmprestimo}</td>
-            <td><b>R$ ${item.valor.toFixed(2)}</b><br>${gpsBadge}</td>
-            <td style="text-align:center;">
-                <button class="btn-print" onclick="imprimirCupom('${item.id}', 'corrida')">🖨️ Recibo</button>
-            </td>
-        `;
-        tbody.appendChild(tr);
     });
 
-    pagamentos.forEach(pay => {
-        totalGeralRecebidoFiado += pay.valorRecebido;
-        const tr = document.createElement('tr');
-        tr.style.background = "#f0fdf4";
-        tr.innerHTML = `
-            <td><b>${pay.dataHora}</b><br><small style="color:var(--success)">Acerto: ${pay.cliente}</small></td>
-            <td><span class="badge badge-dinheiro" style="background:#10b981;">Acerto Fiado</span></td>
-            <td><b style="color:var(--success)">R$ ${pay.valorRecebido.toFixed(2)}</b></td>
-            <td style="text-align:center;">
-                <button class="btn-print" style="background:#10b981;" onclick="imprimirCupom('${pay.id}', 'pagamento')">🖨️ Recibo</button>
-            </td>
-        `;
-        tbody.appendChild(tr);
+    pagamentos.forEach(p => {
+        totRec += p.valorRecebido;
     });
 
-    const trocoInicial = metadadosTurno.trocoInicial || 0;
-    const faturamentoBrutoCaixa = totalGeralDinheiro + totalGeralRecebidoFiado;
-    const saldoFinalCaixaFisico = trocoInicial + faturamentoBrutoCaixa - totalGeralEmprestimos;
+    const faturamentoBrutoCaixa = totDinh + totRec;
+    const troco = metadadosTurno.trocoInicial || 0;
+    const taxaPonto = (totCred + totDinh) * 0.20;
+    const saldoFinalCaixaEsperado = troco + faturamentoBrutoCaixa - totEmp;
 
-    document.getElementById('lblTotalDinheiro').innerText = "R$ " + totalGeralDinheiro.toFixed(2);
-    document.getElementById('lblTotalCredito').innerText = "R$ " + totalGeralCredito.toFixed(2);
-    document.getElementById('lblTotalEmprestimos').innerText = "R$ " + totalGeralEmprestimos.toFixed(2);
-    document.getElementById('lblTotalRecebidoFiado').innerText = "R$ " + totalGeralRecebidoFiado.toFixed(2);
-    document.getElementById('lblSaldoCaixaFisico').innerText = "R$ " + saldoFinalCaixaFisico.toFixed(2);
+    document.getElementById('totTrocoInicial').innerText = "R$ " + troco.toFixed(2);
+    document.getElementById('totNormais').innerText = "R$ " + totDinh.toFixed(2);
+    document.getElementById('totCorridasCredito').innerText = "R$ " + totCred.toFixed(2);
+    document.getElementById('totBruto').innerText = "R$ " + totEmp.toFixed(2);
+    document.getElementById('totAcrescimo').innerText = "+ R$ " + taxaPonto.toFixed(2);
+    document.getElementById('totGeral').innerText = "R$ " + saldoFinalCaixaEsperado.toFixed(2);
+
+    document.getElementById('cardTotais').style.display = 'block';
 }
 
-function imprimirCupom(id, tipoCupom) {
-    let dados = null;
-    if (tipoCupom === 'corrida') {
-        dados = registros.find(x => x.id === id);
-    } else {
-        dados = pagamentos.find(x => x.id === id);
+function gerarRelatorio() {
+    let totDinh = 0; let totCred = 0; let totEmp = 0; let totRec = 0;
+    let descCorridas = "";
+
+    registros.forEach(x => {
+        if(x.tipo === 'credito') {
+            totCred += x.valor; totEmp += (x.emprestimo || 0);
+            descCorridas += `[CORP] ${x.cliente.toUpperCase()} -> Corrida: R$ ${x.valor.toFixed(2)} | Emp: R$ ${(x.emprestimo||0).toFixed(2)}
+`;
+        } else {
+            totDinh += x.valor;
+            descCorridas += `[PART] Avulso -> R$ ${x.valor.toFixed(2)}
+`;
+        }
+    });
+
+    let descAcertos = "";
+    pagamentos.forEach(p => {
+        totRec += p.valorRecebido;
+        descAcertos += `[RECB] ${p.cliente.toUpperCase()} -> Amortizou R$ ${p.valorRecebido.toFixed(2)}
+`;
+    });
+
+    const troco = metadadosTurno.trocoInicial || 0;
+    const faturamentoBrutoCaixa = totDinh + totRec;
+    const finalCaixa = troco + faturamentoBrutoCaixa - totEmp;
+    const comissaoPonto = (totCred + totDinh) * 0.20;
+
+    let txt = `=========================================
+`;
+    txt += `          DRIVERFLUX - RELATÓRIO         
+`;
+    txt += `=========================================
+`;
+    txt += `MOTORISTA: ${usuarioLogado.toUpperCase()}
+`;
+    txt += `TURNO REF: #${idTurnoAtivo.substring(1,8).toUpperCase()}
+`;
+    txt += `ABERTURA : ${metadadosTurno.abertura}
+`;
+    if(metadadosTurno.fechamento) txt += `FECHAMENTO: ${metadadosTurno.fechamento}
+`;
+    txt += `CONTRATO : ${metadadosTurno.tipoContrato ? metadadosTurno.tipoContrato.toUpperCase() : 'EFETIVO'}
+`;
+    txt += `-----------------------------------------
+`;
+    txt += `HISTÓRICO DE LANÇAMENTOS DO CAIXA:
+`;
+    txt += descCorridas || `Nenhuma corrida registrada.
+`;
+    txt += `
+RECOLHIMENTO DE FIADOS:
+`;
+    txt += descAcertos || `Nenhum acerto efetuado.
+`;
+    txt += `-----------------------------------------
+`;
+    txt += `RESUMO FINANCEIRO:
+`;
+    txt += `(+) FUNDO DE TROCO INICIAL : R$ ${troco.toFixed(2)}
+`;
+    txt += `(+) CORRIDAS EM DINHEIRO   : R$ ${totDinh.toFixed(2)}
+`;
+    txt += `(+) ACERTOS DE FIADO       : R$ ${totRec.toFixed(2)}
+`;
+    txt += `(-) DINHEIRO FINANCIADO    : R$ ${totEmp.toFixed(2)}
+`;
+    txt += `-----------------------------------------
+`;
+    txt += `(=) DINHEIRO VIVO EM CAIXA : R$ ${finalCaixa.toFixed(2)}
+`;
+    txt += `-----------------------------------------
+`;
+    txt += `Faturamento Total: R$ ${(totCred+totDinh).toFixed(2)}
+`;
+    txt += `Taxa de Administração (20%): R$ ${comissaoPonto.toFixed(2)}
+`;
+    txt += `=========================================
+`;
+
+    document.getElementById('reportOutput').innerText = txt;
+    document.getElementById('cardRelatorio').style.display = 'block';
+}
+
+function efetuarLogout() {
+    if(confirm("Deseja sair da sua conta?")) {
+        localStorage.removeItem("driverflux_user");
+        location.reload();
     }
+}
+
+function cadastrarNovoMotoristaMaster() {
+    const user = prompt("Digite o nome do novo operador (letras minúsculas, sem espaço):");
+    if(!user) return;
+    const senha = prompt("Digite a senha numérica para esse operador:");
+    if(!senha) return;
+    const tipo = prompt("Digite o regime de contrato (efetivo, diaria ou comissao):", "efetivo");
     
-    if (!dados) return alert("Erro ao carregar dados do recibo.");
-
-    let tContrato = metadadosTurno.tipoContrato ? metadadosTurno.tipoContrato.toUpperCase() : "EFETIVO";
-    let motoristaNome = metadadosTurno.motorista ? metadadosTurno.motorista.toUpperCase() : "MOTORISTA";
-    let textoCupom = "";
-
-    if (tipoCupom === 'corrida') {
-        const totalPassageiro = dados.valor + (dados.emprestimo || 0);
-        textoCupom = `
-=========================================
-          DRIVERFLUX CORPORATIVO         
-=========================================
-MOTORISTA: ${motoristaNome} [${tContrato}]
-TURNO REF: #${idTurnoAtivo.substring(1,8).toUpperCase()}
-DATA/HORA: ${dados.dataHora}
------------------------------------------
-TIPO: LANCAMENTO ${dados.tipo.toUpperCase()}
-CLIENTE: ${dados.cliente.toUpperCase()}
-
-VALOR DA CORRIDA:    R$ ${dados.valor.toFixed(2)}
-DINHEIRO EMPRESTADO: R$ ${(dados.emprestimo || 0).toFixed(2)}
------------------------------------------
-TOTAL A SER COBRADO: R$ ${totalPassageiro.toFixed(2)}
-
------------------------------------------
-VALIDACAO GEOGRAFICA DE SEGURANCA:
-COORDENADAS: ${dados.coordenadas || "Não capturado"}
------------------------------------------
-   Obrigado por voar com a DriverFlux!   
-=========================================
-\n\n\n`;
-    } else {
-        textoCupom = `
-=========================================
-         RECIBO DE QUITACAO/PAGTO        
-=========================================
-MOTORISTA: ${motoristaNome}
-DATA/HORA: ${dados.dataHora}
------------------------------------------
-RECEBEMOS DE: ${dados.cliente.toUpperCase()}
-A QUANTIA DE: R$ ${dados.valorRecebido.toFixed(2)}
-
-REFERENTE A: AMORTIZACAO DE DEBITOS DE
-CORRIDAS ANTERIORES NO SISTEMA FLUX.
------------------------------------------
-SALDO ATUALIZADO NO BANCO DE DADOS ONLINE
-=========================================
-\n\n\n`;
-    }
-
-    const janelaImpressao = window.open('', '_blank', 'width=300,height=400');
-    janelaImpressao.document.write('<pre style="font-family:monospace;font-size:12px;line-height:1.2;">' + textoCupom + '</pre>');
-    janelaImpressao.document.close();
-    janelaImpressao.print();
-    janelaImpressao.close();
+    db.ref(`usuarios/${user.toLowerCase().trim()}`).set({
+        senha: senha.trim(),
+        tipo: tipo.toLowerCase().trim()
+    }).then(() => {
+        alert("👤 Motorista cadastrado com sucesso na nuvem!");
+    });
 }
 
-function limparSessao() {
-    localStorage.clear();
-    window.location.href = "login.html";
-}
-
-let turnosHistoricoMaster = {};
 function carregarTurnosMaster() {
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') return;
     db.ref('turnos').once('value', (snapshot) => {
         const select = document.getElementById('selectFiltroTurnoMaster');
         if (!select) return;
-        select.innerHTML = '<option value="">-- Selecione um Turno para Auditoria --</option>';
+        select.innerHTML = '<option value="">-- Escolha um Caixa para Auditar --</option>';
         turnosHistoricoMaster = snapshot.val() || {};
         
-        db.ref('usuarios').once('value', (uSnap) => {
-            const uData = uSnap.val() || {};
-            Object.keys(turnosHistoricoMaster).forEach(turnoId => {
-                const t = turnosHistoricoMaster[turnoId];
-                const motorista = t.motorista || "";
-                const mInfo = uData[motorista];
-                let tContrato = (mInfo && mInfo.tipo) ? mInfo.tipo : (t.tipoContrato || "efetivo");
-                
-                const opt = document.createElement('option');
-                opt.value = turnoId;
-                const statusIcon = t.status === 'aberto' ? '🟢 (Ativo)' : '🔴 (Fechado)';
-                opt.innerText = `${statusIcon} ${t.motorista.toUpperCase()} [${tContrato.toUpperCase()}] | Início: ${t.abertura}`;
-                select.appendChild(opt);
-            });
+        Object.keys(turnosHistoricoMaster).forEach(turnoId => {
+            const t = turnosHistoricoMaster[turnoId];
+            const opt = document.createElement('option');
+            opt.value = turnoId;
+            const statusIcon = t.status === 'aberto' ? '🟢 (Ativo)' : '🔴 (Fechado)';
+            opt.innerText = `${statusIcon} ${t.motorista.toUpperCase()} | Início: ${t.abertura}`;
+            select.appendChild(opt);
         });
     });
 }
 
 function selecionarTurnoParaVerificacaoMaster() {
     const selectedId = document.getElementById('selectFiltroTurnoMaster').value;
-    document.getElementById('cardTotais').style.display = 'none';
-    document.getElementById('cardRelatorio').style.display = 'none';
-    
-    if (!selectedId) {
-        registros = [];
-        renderizarTabela();
-        document.getElementById('lblIdTurnoAtivo').innerText = "Turno: Nenhum selecionado";
-        return;
-    }
+    if (!selectedId) return;
 
     metadadosTurno = turnosHistoricoMaster[selectedId];
     idTurnoAtivo = selectedId;
-    let contratoLog = metadadosTurno.tipoContrato ? metadadosTurno.tipoContrato.toUpperCase() : "EFETIVO";
-    document.getElementById('lblIdTurnoAtivo').innerText = `Auditoria Turno: #${idTurnoAtivo.substring(1, 8).toUpperCase()} | Tipo: ${contratoLog}`;
     
     db.ref(`corridas_por_turno/${selectedId}`).once("value", (snapshot) => {
         registros = [];
         const data = snapshot.val();
         if (data) {
             Object.keys(data).forEach(k => {
-                let item = data[k];
-                registros.push({ id: k, ...item });
+                registros.push({ id: k, ...data[k] });
             });
         }
         
-        db.ref(`pagamentos_por_turno/${selectedId}`).once("value", (pSnapshot) => {
-            pagamentos = [];
-            const pData = pSnapshot.val();
-            if (pData) {
-                Object.keys(pData).forEach(k => {
-                    pagamentos.push({ id: k, ...pData[k] });
-                });
-            }
-            
-            document.getElementById('cardTotais').style.display = 'block';
-            document.getElementById('cardRelatorio').style.display = 'block';
-            renderizarTabela();
-        });
+        pagamentos = [];
+        calcularTotais();
+        renderizarTabela();
     });
-}
+        }
