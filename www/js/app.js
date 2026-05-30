@@ -440,8 +440,14 @@ function ajustarCamposPorModalidade() { const tipo = document.getElementById('in
 function fecharModal() { document.getElementById('formModal').style.display = 'none'; }
 
 function abrirModalEdicao(id) { 
-    if (localStorage.getItem('driverflux_modo_demo') === 'true' && id !== null) return; 
-    if (id === null) {
+    // Se for modo demo e o cara tentar EDITAR uma corrida existente (id válido), aí sim bloqueia
+    if (localStorage.getItem('driverflux_modo_demo') === 'true' && id !== null && id !== "") {
+        alert("🔒 Edição de registros bloqueada no modo de demonstração.");
+        return; 
+    }
+    
+    // Se o id for null ou vazio, significa que é uma NOVA corrida (Inclusão)
+    if (id === null || id === "") {
         document.getElementById('modalTitle').innerText = `Lançar Corrida`;
         document.getElementById('editId').value = "";
         document.getElementById('inputTipoLancamento').value = "normal";
@@ -450,7 +456,9 @@ function abrirModalEdicao(id) {
         document.getElementById('inputWhatsCliente').value = "";
         document.getElementById('inputEmprestimo').value = 0;
     } else {
-        const reg = registros.find(r => r.id === id); if (!reg) return;
+        // Se for modo completo, permite carregar os dados para editar
+        const reg = registros.find(r => r.id === id); 
+        if (!reg) return;
         document.getElementById('modalTitle').innerText = `Alterar Registro #${id}`;
         document.getElementById('editId').value = id;
         document.getElementById('inputTipoLancamento').value = reg.tipo || "normal";
@@ -458,8 +466,11 @@ function abrirModalEdicao(id) {
         document.getElementById('inputCliente').value = reg.cliente || "";
         document.getElementById('inputEmprestimo').value = reg.emprestado || 0;
     }
-    ajustarCamposPorModalidade(); document.getElementById('formModal').style.display = 'flex'; 
+    
+    ajustarCamposPorModalidade(); 
+    document.getElementById('formModal').style.display = 'flex'; 
 }
+
 
 function inicializarMaster() { db.ref("usuarios").once("value", (snapshotUser) => { motoristasCadastroMaster = snapshotUser.val() || {}; db.ref("turnos_operacionais").on("value", (snapshot) => { const data = snapshot.val(); const select = document.getElementById('selectFiltroTurnoMaster'); select.innerHTML = '<option value="">-- Escolha um Turno / Caixa para Auditar --</option>'; turnosHistoricoMaster = {}; if (data) { Object.keys(data).forEach(motorista => { Object.keys(data[motorista]).forEach(turnoId => { const t = data[motorista][turnoId]; turnosHistoricoMaster[turnoId] = t; let mInfo = motoristasCadastroMaster[motorista]; let tContrato = (mInfo && mInfo.tipo) ? mInfo.tipo : (t.tipoContrato || "efetivo"); const opt = document.createElement('option'); opt.value = turnoId; const statusIcon = t.status === 'aberto' ? '🟢 (Ativo)' : '🔴 (Fechado)'; opt.innerText = `${statusIcon} ${t.motorista.toUpperCase()} [${tContrato.toUpperCase()}] | Início: ${t.abertura}`; select.appendChild(opt); }); }); } }); }); }
 function selecionarTurnoParaVerificacaoMaster() { const selectedId = document.getElementById('selectFiltroTurnoMaster').value; document.getElementById('cardTotais').style.display = 'none'; document.getElementById('cardRelatorio').style.display = 'none'; if (!selectedId) { registros = []; renderizarTabela(); document.getElementById('lblIdTurnoAtivo').innerText = "Turno: Nenhum selecionado"; return; } metadadosTurno = turnosHistoricoMaster[selectedId]; idTurnoAtivo = selectedId; let contratoLog = metadadosTurno.tipoContrato ? metadadosTurno.tipoContrato.toUpperCase() : "EFETIVO"; document.getElementById('lblIdTurnoAtivo').innerText = `Auditoria Turno: #${idTurnoAtivo.substring(1, 8).toUpperCase()} | Tipo: ${contratoLog}`; db.ref(`corridas_por_turno/${selectedId}`).once("value", (snapshot) => { registros = []; const data = snapshot.val(); if (data) { Object.keys(data).forEach(k => { let item = data[k]; item.docId = k; registros.push(item); }); registros.sort((a, b) => a.id - b.id); } renderizarTabela(); }); }
