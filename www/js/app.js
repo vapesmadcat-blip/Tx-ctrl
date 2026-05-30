@@ -1,6 +1,6 @@
 /**
  * APP.JS - DriverFlux Oficial (Com Hodômetro, Cobrança de Fiado e Emissão de Recibo Corporativo)
- * Lógica de Negócio Completa com Atalhos de Teste e Botão de Ativação Demo Integrado
+ * Lógica de Negócio Completa com Atalhos de Teste e Disparo de WhatsApp Blindado para Android
  */
 
 const firebaseConfig = {
@@ -68,7 +68,7 @@ function verificarAtivacao() {
     const digitada = parseInt(inputVal, 10);
 
     if (digitada === 222) {
-        alert("🛠️ [Bancada] Forçando ativação do MODO COMPLETO...");
+        alert("🛠️ [Bancada] Forçando activation do MODO COMPLETO...");
         ativarVersãoCompletaDefinitiva();
         return;
     }
@@ -154,7 +154,6 @@ function verificarSessaoLogin() {
     }
 }
 
-// ENGENHARIA DE RENDER: Cria e atualiza o botão de upgrade dinamicamente dentro do painel operativo
 function renderToggleAcoesDemo() {
     if (localStorage.getItem('driverflux_modo_demo') !== 'true') return;
     
@@ -162,12 +161,10 @@ function renderToggleAcoesDemo() {
     if (!containerAviso) {
         containerAviso = document.createElement('div');
         containerAviso.id = "badgeAvisoContador";
-        containerAviso.style.cssText = "background:#fffbeb; color:#b45309; font-size:12px; padding:10px; border-radius:10px; text-align:center; width:100%; margin-bottom:14px; font-weight:700; border:1px solid #fde68a; cursor:pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.05);";
+        containerAviso.style.cssText = "background:#fffbeb; color:#b45309; font-size:12px; padding:10px; border-radius:10px; text-align:center; width:100%; margin-bottom:14px; font-weight:700; border:1px solid #fde68a; cursor:pointer;";
         
         const divApp = document.getElementById('conteudoApp');
-        if (divApp) {
-            divApp.insertBefore(containerAviso, divApp.firstChild);
-        }
+        if (divApp) { divApp.insertBefore(containerAviso, divApp.firstChild); }
     }
     
     containerAviso.innerText = `📈 Limite Demo: ${registros.length} de ${LIMITE_DEMO} registros. (Clique aqui para Ativar versão Oficial)`;
@@ -178,10 +175,10 @@ function renderToggleAcoesDemo() {
         
         if (senhaUpgrade) {
             let digitadaUpgrade = parseInt(senhaUpgrade.trim(), 10);
-            if (digitadaUpgrade === 222 || digitadaUpgrade === obtenerSenhaDefinitiva(desafioAtual)) {
+            if (digitadaUpgrade === 222 || digitadaUpgrade === obterSenhaDefinitiva(desafioAtual)) {
                 ativarVersãoCompletaDefinitiva();
             } else {
-                alert("❌ Contra-senha definitiva inválida para este desafio!");
+                alert("❌ Contra-senha definitiva inválida!");
             }
         }
     };
@@ -212,16 +209,12 @@ function abrirModalEdicao(id) {
     document.getElementById('formModal').style.display = 'flex'; 
 }
 
-function fecharModal() {
-    document.getElementById('formModal').style.display = 'none';
-}
+function fecharModal() { document.getElementById('formModal').style.display = 'none'; }
 
 function ajustarCamposPorModalidade() {
     const tipo = document.getElementById('inputTipoLancamento').value;
     const camposCredito = document.getElementById('camposCreditoOpcionais');
-    if (camposCredito) {
-        camposCredito.style.display = (tipo === 'credito') ? 'block' : 'none';
-    }
+    if (camposCredito) { camposCredito.style.display = (tipo === 'credito') ? 'block' : 'none'; }
 }
 
 function capturarGpsPromessa() {
@@ -235,9 +228,7 @@ function capturarGpsPromessa() {
                 (error) => { resolve("Não capturado"); },
                 { enableHighAccuracy: true, timeout: 5000 }
             );
-        } else {
-            resolve("Não suportado");
-        }
+        } else { resolve("Não suportado"); }
     });
 }
 
@@ -348,25 +339,14 @@ async function salvarDados() {
 
     let dadosCorrida = {
         id: registros.length > 0 ? Math.max(...registros.map(r => r.id)) + 1 : 1,
-        tipo: tipo, 
-        cliente: nomeCliente, 
-        emprestado: vEmprestimo, 
-        corrida: vCorrida, 
-        dataHora: dataHoraStr, 
-        gps: gpsFinal, 
-        whatsCliente: whatsCliente
+        tipo: tipo, cliente: nomeCliente, emprestado: vEmprestimo, corrida: vCorrida, dataHora: dataHoraStr, gps: gpsFinal, whatsCliente: whatsCliente
     };
 
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
         if (editId) {
             const index = registros.findIndex(r => r.id == editId);
-            if (index !== -1) {
-                dadosCorrida.id = parseInt(editId);
-                registros[index] = dadosCorrida;
-            }
-        } else {
-            registros.push(dadosCorrida);
-        }
+            if (index !== -1) { dadosCorrida.id = parseInt(editId); registros[index] = dadosCorrida; }
+        } else { registros.push(dadosCorrida); }
         localStorage.setItem('driverflux_demo_reg', JSON.stringify(registros));
         finalizarSalvamento(dadosCorrida, whatsCliente);
     } else {
@@ -388,17 +368,12 @@ async function salvarDados() {
 }
 
 function finalizarSalvamento(dados, whats) {
-    fecharModal(); 
-    renderizarTabela(); 
-    atualizarListaSugestoes();
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
-        renderToggleAcoesDemo();
-    }
-    if (dados.tipo === 'credito') { 
-        prepararDisparoReciboNativo(dados, whats); 
-    }
+    fecharModal(); renderizarTabela(); atualizarListaSugestoes();
+    if (localStorage.getItem('driverflux_modo_demo') === 'true') { renderToggleAcoesDemo(); }
+    if (dados.tipo === 'credito') { prepararDisparoReciboNativo(dados, whats); }
 }
 
+// CORREÇÃO CIRÚRGICA: Protocolo direto universal para pular bloqueios de iframe do WebView/Cordova
 function prepararDisparoReciboNativo(reg, whatsappSugerido) {
     let txtMensagem = "";
     let localizacaoGps = reg.gps || "Não capturado";
@@ -416,8 +391,10 @@ function prepararDisparoReciboNativo(reg, whatsappSugerido) {
     if (confirmarEnvio) {
         let destino = prompt("📱 Digite o WhatsApp de destino (Com DDD, apenas números):", whatsappSugerido || "51");
         if (!destino || destino === "51") return alert("⚠️ Operação cancelada. Número inválido.");
-        let urlWhats = `https://api.whatsapp.com/send?phone=55${destino}&text=${encodeURIComponent(txtMensagem)}`;
-        window.open(urlWhats, '_system');
+        
+        // Protocolo universal direto do sistema operacional - Abre o app nativo instantaneamente
+        let urlWhats = `whatsapp://send?phone=55${destino}&text=${encodeURIComponent(txtMensagem)}`;
+        window.location.href = urlWhats;
     }
 }
 
@@ -467,12 +444,8 @@ function realizarLogin() {
             if (senhaCorreta === pass) { 
                 localStorage.setItem('driverflux_usuario_logado', user); 
                 verificarSessaoLogin(); 
-            } else { 
-                alert("❌ Senha incorreta!"); 
-            }
-        } else { 
-            alert("❌ Usuário não cadastrado!"); 
-        }
+            } else { alert("❌ Senha incorreta!"); }
+        } else { alert("❌ Usuário não cadastrado!"); }
     });
 }
 
@@ -491,8 +464,7 @@ function efetuarLogout() {
 function efetuarLogoutPronto() {
     localStorage.removeItem('driverflux_usuario_logado'); 
     localStorage.removeItem('driverflux_licenca_ativa'); 
-    usuarioLogado = ""; 
-    idTurnoAtivo = "";
+    usuarioLogado = ""; idTurnoAtivo = "";
     if(document.getElementById('cardTotais')) document.getElementById('cardTotais').style.display = 'none'; 
     if(document.getElementById('cardRelatorio')) document.getElementById('cardRelatorio').style.display = 'none';
     verificarSessaoLogin();
@@ -501,12 +473,7 @@ function efetuarLogoutPronto() {
 function calcularTotais() {
     let tNormais = 0, tCreditoCorridas = 0, tBrutoEmprestado = 0;
     registros.forEach(r => { 
-        if (r.tipo === 'credito') { 
-            tCreditoCorridas += r.corrida; 
-            tBrutoEmprestado += r.emprestado; 
-        } else { 
-            tNormais += r.corrida; 
-        } 
+        if (r.tipo === 'credito') { tCreditoCorridas += r.corrida; tBrutoEmprestado += r.emprestado; } else { tNormais += r.corrida; } 
     });
     let juros = tBrutoEmprestado * 0.20;
     let fundoFixo = (localStorage.getItem('driverflux_modo_demo') === 'true') ? (parseFloat(localStorage.getItem('driverflux_demo_troco')) || 0) : (metadadosTurno.trocoInicial || 0);
@@ -520,16 +487,14 @@ function calcularTotais() {
     document.getElementById('cardTotais').style.display = 'block';
 }
 
-function formatarMoeda(valor) {
-    return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
+function formatarMoeda(valor) { return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
 
 function inicializarMotorista() {
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
         const salvo = localStorage.getItem('driverflux_demo_reg');
         registros = salvo ? JSON.parse(salvo) : [];
         renderizarTabela();
-        renderToggleAcoesDemo(); // Garante o gatilho visual do botão
+        renderToggleAcoesDemo(); 
         return;
     }
     iniciarFirebaseSeNecessario();
@@ -581,17 +546,12 @@ function cadastrarNovoMotoristaMaster() {
     const tipo = prompt("Tipo de contrato (efetivo/comissionado):", "efetivo");
     
     iniciarFirebaseSeNecessario();
-    db.ref(`usuarios/${user.toLowerCase()}`).set({
-        senha: pass,
-        tipo: tipo.toLowerCase()
-    }).then(() => alert("Motorista cadastrado!"));
+    db.ref(`usuarios/${user.toLowerCase()}`).set({ senha: pass, tipo: tipo.toLowerCase() }).then(() => alert("Motorista cadastrado!"));
 }
 
 function garantirUsuariosBaseNoFirebase() {
     db.ref('usuarios/master').once('value').then(snap => {
-        if (!snap.exists()) {
-            db.ref('usuarios/master').set({ senha: '123', tipo: 'master' });
-        }
+        if (!snap.exists()) { db.ref('usuarios/master').set({ senha: '123', tipo: 'master' }); }
     });
 }
 
@@ -615,63 +575,39 @@ function atualizarListaSugestoes() {
 function gerarRelatorio() {
     let tNormais = 0, tCredito = 0, tEmprestado = 0;
     registros.forEach(r => { 
-        if (r.tipo === 'credito') { 
-            tCredito += r.corrida; 
-            tEmprestado += r.emprestado; 
-        } else { 
-            tNormais += r.corrida; 
-        } 
+        if (r.tipo === 'credito') { tCredito += r.corrida; tEmprestado += r.emprestado; } else { tNormais += r.corrida; } 
     });
     
     let fundo = (localStorage.getItem('driverflux_modo_demo') === 'true') ? (parseFloat(localStorage.getItem('driverflux_demo_troco')) || 0) : (metadadosTurno.trocoInicial || 0);
     let totalCarro = fundo + tNormais;
     let pfxAtivo = metadadosTurno.prefixoCarro ? metadadosTurno.prefixoCarro.toUpperCase() : "N/I";
 
-    let txt = `🧾 DRIVERFLUX - RELATÓRIO DE CAIXA\n`;
-    txt += `=========================================\n`;
-    txt += `🚖 VEÍCULO / PREFIXO AUDITADO: ${pfxAtivo}\n`;
-    txt += `👤 MOTORISTA / OPERADOR: ${usuarioLogado.toUpperCase()}\n`;
-    txt += `=========================================\n\n`;
-    txt += `(+) Troco Inicial: ${formatarMoeda(fundo)}\n`;
-    txt += `(+) Corridas Dinheiro: ${formatarMoeda(tNormais)}\n`;
-    txt += `(+) Corridas Fiado/Crédito: ${formatarMoeda(tCredito)}\n`;
-    txt += `(+) Auxílio Emprestado: ${formatarMoeda(tEmprestado)}\n`;
-    txt += `-----------------------------------------\n`;
+    let txt = `🧾 DRIVERFLUX - RELATÓRIO DE CAIXA\n=========================================\n`;
+    txt += `🚖 VEÍCULO / PREFIXO AUDITADO: ${pfxAtivo}\n👤 MOTORISTA / OPERADOR: ${usuarioLogado.toUpperCase()}\n=========================================\n\n`;
+    txt += `(+) Troco Inicial: ${formatarMoeda(fundo)}\n(+) Corridas Dinheiro: ${formatarMoeda(tNormais)}\n(+) Corridas Fiado/Crédito: ${formatarMoeda(tCredito)}\n(+) Auxílio Emprestado: ${formatarMoeda(tEmprestado)}\n-----------------------------------------\n`;
     txt += `(=) TOTAL CAIXA CARRO: ${formatarMoeda(totalCarro)}\n\n=========================================\n`;
 
     let imprimir = confirm(`📄 FECHAMENTO DE TURNO:\n\n${txt}\n\nDeseja abrir a janela de impressão do sistema?`);
     if (imprimir) {
         const output = document.getElementById('reportOutput');
         const card = document.getElementById('cardRelatorio');
-        if(output && card) {
-            output.innerText = txt;
-            card.style.display = 'block';
-        }
+        if(output && card) { output.innerText = txt; card.style.display = 'block'; }
         window.print();
     }
 }
 
-function encerarTurnoDefinitivo() {
-    encerrarTurnoDefinitivo();
-}
+function encerarTurnoDefinitivo() { encerrarTurnoDefinitivo(); }
 
 function encerrarTurnoDefinitivo() {
     if (!confirm("Deseja realmente encerrar este turno?")) return;
-    
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
         localStorage.setItem('driverflux_demo_status', 'fechado');
-        location.reload();
-        return;
+        location.reload(); return;
     }
-    
     iniciarFirebaseSeNecessario();
     db.ref(`turnos_operacionais/${usuarioLogado}/${idTurnoAtivo}`).update({
-        status: 'fechado',
-        fechamento: new Date().toLocaleString('pt-BR')
-    }).then(() => {
-        alert("Turno encerrado com sucesso!");
-        location.reload();
-    });
+        status: 'fechado', fechamento: new Date().toLocaleString('pt-BR')
+    }).then(() => { alert("Turno encerrado com sucesso!"); location.reload(); });
 }
 
 function processarConsultaCliente() {
@@ -688,15 +624,7 @@ function processarConsultaCliente() {
     ficha.style.display = 'block';
 }
 
-function limparConsulta() {
-    document.getElementById('inputPesquisa').value = '';
-    processarConsultaCliente();
-}
+function limparConsulta() { document.getElementById('inputPesquisa').value = ''; processarConsultaCliente(); }
+function registrarPagamento() { alert("Funcionalidade de amortização em desenvolvimento."); }
 
-function registrarPagamento() {
-    alert("Funcionalidade de amortização em desenvolvimento.");
-}
-
-window.onload = () => {
-    checarLicenciamento();
-};
+window.onload = () => { checarLicenciamento(); };
