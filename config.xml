@@ -1,15 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget id="com.example.app" version="1.0.0">
-    <name>App Name</name>
-    <description>Description</description>
+<widget id="com.driverflux.app" version="1.0.0">
+    <name>DriverFlux</name>
+    <description>Sistema de Gestão de Corridas e Frota de Táxi</description>
     
-    <!-- ⬇️ ADICIONE AQUI - Permissões para GPS -->
+    <!-- Permissões para GPS e Localização -->
     <permission name="ACCESS_FINE_LOCATION" />
     <permission name="ACCESS_COARSE_LOCATION" />
     
-    <!-- ⬇️ ADICIONE AQUI - Plugin de Geolocalização -->
+    <!-- Plugin de Geolocalização -->
     <plugin name="cordova-plugin-geolocation" spec="^4.1.0">
         <variable name="GEOLOCATION_USAGE_DESCRIPTION" value="O app precisa acessar seu GPS para registrar a localização das corridas" />
     </plugin>
+    
+    <!-- Ícone da Aplicação -->
+    <icon src="res/icon.png" width="192" height="192" />
+    
+    <!-- Splash Screen -->
+    <splash src="res/splash.png" width="320" height="480" />
     
 </widget>
