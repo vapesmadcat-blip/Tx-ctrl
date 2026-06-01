@@ -170,7 +170,7 @@ function renderToggleAcoesDemo() {
     if (!containerAviso) {
         containerAviso = document.createElement('div');
         containerAviso.id = "badgeAvisoContador";
-        containerAviso.style.cssText = "background:#fffbeb; color:#b45309; font-size:12px; padding:10px; border-radius:10px; text-align:center; width:100%; margin-bottom:14px; font-weight:700; bo[...]
+        containerAviso.style.cssText = "background:#fffbeb; color:#b45309; font-size:12px; padding:10px; border-radius:10px; text-align:center; width:100%; margin-bottom:14px; font-weight:700; border:2px solid #fcd34d;";
         
         const divApp = document.getElementById('conteudoApp');
         if (divApp) { divApp.insertBefore(containerAviso, divApp.firstChild); }
@@ -249,7 +249,7 @@ function injetarCampoPrefixoCarroSeNecessario() {
             divGrupo.className = 'input-group';
             divGrupo.style.marginBottom = '14px';
             divGrupo.innerHTML = `<label style="display:block; font-size:13px; font-weight:600; color:var(--texto-secundario); margin-bottom:4px;">🚖 Prefixo do Carro / Placa</label>
-                                  <input type="text" id="inputPrefixoCarro" placeholder="Ex: CARRO-04 ou PLACA" style="width:100%; padding:11px; border:2px solid #e2e8f0; border-radius:10px; font[...]
+                                  <input type="text" id="inputPrefixoCarro" placeholder="Ex: CARRO-04 ou PLACA" style="width:100%; padding:11px; border:2px solid #e2e8f0; border-radius:10px; font-size:14px;">`;
             containerKm.parentNode.insertBefore(divGrupo, containerKm);
         }
     }
@@ -389,10 +389,10 @@ function prepararDisparoReciboNativo(reg, whatsappSugerido) {
 
     if (reg.tipo === 'credito') {
         const totalDevido = reg.corrida + (reg.emprestado * 1.20);
-        txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n🚗 *PREFIXO VEÍCULO:* ${pfxRecibo}\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* [...]
+        txtMensagem = `🧾 *COMPROVANTE DE CORRIDA - DRIVERFLUX*\n-----------------------------------------\n🚗 *PREFIXO VEÍCULO:* ${pfxRecibo}\n📅 *Data:* ${reg.dataHora}\n👤 *Cliente:* ${reg.cliente}\n💰 *Corrida:* R$ ${reg.corrida.toFixed(2)}\n🏦 *Empréstimo:* R$ ${reg.emprestado.toFixed(2)}\n📊 *Total com Juros (20%):* R$ ${totalDevido.toFixed(2)}\n📍 *Localização:* ${localizacaoGps}\n-----------------------------------------`;
     } else {
         let descCliente = reg.cliente && reg.cliente !== "Passageiro Avulso" ? reg.cliente.toUpperCase() : "PASSAGEIRO CORPORATIVO";
-        txtMensagem = `🧾 *NOTA FISCAL / RECIBO DE TÁXI - DRIVERFLUX*\n=========================================\n🏢 *PRESTADOR:* Serviço de Táxi DriverFlux\n🚖 *VEÍCULO OFICIAL:* Prefi[...]
+        txtMensagem = `🧾 *NOTA FISCAL / RECIBO DE TÁXI - DRIVERFLUX*\n=========================================\n🏢 *PRESTADOR:* Serviço de Táxi DriverFlux\n🚖 *VEÍCULO OFICIAL:* Prefixo ${pfxRecibo}\n👤 *CLIENTE:* ${descCliente}\n💰 *VALOR DA CORRIDA:* R$ ${reg.corrida.toFixed(2)}\n📅 *DATA/HORA:* ${reg.dataHora}\n📍 *LOCALIZAÇÃO GPS:* ${localizacaoGps}\n=========================================\nObrigado pela preferência!`;
     }
 
     let confirmarEnvio = confirm(`📄 REVISÃO DO RECIBO:\n\n${txtMensagem.replace(/\*/g, '')}\n\nDeseja disparar este comprovante via WhatsApp?`);
@@ -426,8 +426,8 @@ function renderizarTabela() {
         const descCliente = reg.tipo === 'credito' ? (reg.cliente || 'N/I') : 'Passageiro Balcão';
         const valorExibido = reg.tipo === 'credito' ? (reg.corrida + reg.emprestado) : reg.corrida;
         
-        let acoesHtml = `<button class="btn-nota" style="background:#10b981; color:white; padding:4px 6px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" onc[...]
-        acoesHtml += `<button class="btn-whats" style="background:#25d366; color:white; padding:4px 6px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" oncli[...]
+        let acoesHtml = `<button class="btn-nota" style="background:#10b981; color:white; padding:4px 6px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" onclick="emititNotaFiscalWhatsApp(${reg.id})">📋 Recibo</button>`;
+        acoesHtml += `<button class="btn-whats" style="background:#25d366; color:white; padding:4px 6px; font-size:11px; margin-right:5px; border:none; border-radius:4px; font-weight:bold;" onclick="revierComprovanteWhats(${reg.id})">💬 WhatsApp</button>`;
         
         if (localStorage.getItem('driverflux_modo_demo') !== 'true') {
             acoesHtml += `<button class="btn-cancel" style="padding:4px 6px; font-size:11px;" onclick="abrirModalEdicao(${reg.id})">Editar</button>`;
@@ -590,7 +590,7 @@ function gerarRelatorio() {
 
     let txt = `🧾 DRIVERFLUX - RELATÓRIO DE CAIXA\n=========================================\n`;
     txt += `🚖 VEÍCULO / PREFIXO AUDITADO: ${pfxAtivo}\n👤 MOTORISTA / OPERADOR: ${usuarioLogado.toUpperCase()}\n=========================================\n\n`;
-    txt += `(+) Troco Inicial: ${formatarMoeda(fundo)}\n(+) Corridas Dinheiro: ${formatarMoeda(tNormais)}\n(+) Corridas Fiado/Crédito: ${formatarMoeda(tCredito)}\n(+) Auxílio Emprestado: ${form[...]
+    txt += `(+) Troco Inicial: ${formatarMoeda(fundo)}\n(+) Corridas Dinheiro: ${formatarMoeda(tNormais)}\n(+) Corridas Fiado/Crédito: ${formatarMoeda(tCredito)}\n(+) Auxílio Emprestado: ${formatarMoeda(tEmprestado)}\n`;
     txt += `(=) TOTAL CAIXA CARRO: ${formatarMoeda(totalCarro)}\n\n=========================================\n`;
 
     let imprimir = confirm(`📄 FECHAMENTO DE TURNO:\n\n${txt}\n\nDeseja abrir a janela de impressão do sistema?`);
@@ -623,82 +623,14 @@ function processarConsultaCliente() {
     
     const corridas = registros.filter(r => r.tipo === 'credito' && r.cliente.toLowerCase() === nome.toLowerCase());
     const totalDevido = corridas.reduce((acc, curr) => acc + curr.corrida + (curr.emprestado * 1.20), 0);
-    const totalPago = (pagamentos[nome] || 0);
-    const saldoFinal = totalDevido - totalPago;
     
     document.getElementById('ledgerNomeCliente').innerText = `Extrato: ${nome.toUpperCase()}`;
     document.getElementById('ledgerTotalDevido').innerText = formatarMoeda(totalDevido);
-    document.getElementById('ledgerTotalPago').innerText = formatarMoeda(totalPago);
-    document.getElementById('ledgerSaldoFinal').innerText = formatarMoeda(saldoFinal);
+    document.getElementById('ledgerSaldoFinal').innerText = formatarMoeda(totalDevido);
     ficha.style.display = 'block';
 }
 
 function limparConsulta() { document.getElementById('inputPesquisa').value = ''; processarConsultaCliente(); }
+function registrarPagamento() { alert("Funcionalidade de amortização em desenvolvimento."); }
 
-function registrarPagamento() {
-    const nome = document.getElementById('inputPesquisa').value.trim();
-    if (!nome) return alert("⚠️ Selecione um cliente primeiro.");
-    
-    const corridas = registros.filter(r => r.tipo === 'credito' && r.cliente.toLowerCase() === nome.toLowerCase());
-    if (corridas.length === 0) return alert("⚠️ Nenhuma corrida em crédito para este cliente.");
-    
-    const totalDevido = corridas.reduce((acc, curr) => acc + curr.corrida + (curr.emprestado * 1.20), 0);
-    const totalPago = (pagamentos[nome] || 0);
-    const saldoFinal = totalDevido - totalPago;
-    
-    if (saldoFinal <= 0) return alert("✅ Cliente sem saldo pendente!");
-    
-    const inputPagamento = document.getElementById('inputValorPagamento');
-    const valorDigitado = parseFloat(inputPagamento.value) || 0;
-    
-    if (valorDigitado <= 0) return alert("⚠️ Digite um valor para amortizar.");
-    if (valorDigitado > saldoFinal) return alert(`⚠️ Valor máximo permitido: ${formatarMoeda(saldoFinal)}`);
-    
-    // Confirmação com detalhes
-    const confirmacao = confirm(
-        `💳 *AMORTIZAÇÃO DE CRÉDITO*\n\n` +
-        `👤 Cliente: ${nome.toUpperCase()}\n` +
-        `📊 Débito Total: ${formatarMoeda(totalDevido)}\n` +
-        `✅ Já Pagou: ${formatarMoeda(totalPago)}\n` +
-        `⚠️ Saldo Pendente: ${formatarMoeda(saldoFinal)}\n\n` +
-        `💰 Valor a Amortizar: ${formatarMoeda(valorDigitado)}\n` +
-        `🔄 Novo Saldo: ${formatarMoeda(saldoFinal - valorDigitado)}\n\n` +
-        `Confirma o registro do pagamento?`
-    );
-    
-    if (!confirmacao) return;
-    
-    // Registrar pagamento
-    if (!pagamentos[nome]) pagamentos[nome] = 0;
-    pagamentos[nome] += valorDigitado;
-    
-    // Salvar no localStorage para modo demo
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
-        localStorage.setItem('driverflux_demo_pagamentos', JSON.stringify(pagamentos));
-    } else {
-        // Salvar no Firebase para versão completa
-        iniciarFirebaseSeNecessario();
-        db.ref(`pagamentos/${usuarioLogado}/${idTurnoAtivo}/${nome.toLowerCase()}`).set({
-            cliente: nome,
-            valor: valorDigitado,
-            data: new Date().toLocaleString('pt-BR'),
-            acumulado: pagamentos[nome]
-        }).catch(err => console.error("Erro ao salvar pagamento:", err));
-    }
-    
-    // Atualizar interface
-    inputPagamento.value = '';
-    processarConsultaCliente();
-    renderizarTabela();
-    
-    alert(`✅ Pagamento Registrado!\n\n💰 Valor Amortizado: ${formatarMoeda(valorDigitado)}\n🔄 Novo Saldo: ${formatarMoeda(saldoFinal - valorDigitado)}`);
-}
-
-window.onload = () => { 
-    checarLicenciamento();
-    // Restaurar pagamentos do localStorage se em modo demo
-    if (localStorage.getItem('driverflux_modo_demo') === 'true') {
-        const pagSalvos = localStorage.getItem('driverflux_demo_pagamentos');
-        if (pagSalvos) pagamentos = JSON.parse(pagSalvos);
-    }
-};
+window.onload = () => { checarLicenciamento(); };
