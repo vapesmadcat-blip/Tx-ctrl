@@ -69,20 +69,21 @@ function checarLicenciamento() {
 }
 
 function verificarAtivacao() {
+    const btn = document.getElementById('btnAtivar');
+    if (btn && btn.disabled) return;
+    if (btn) { btn.disabled = true; btn.innerHTML = "⏳ Verificando..."; }
+
     const desafio = localStorage.getItem('driverflux_codigo_desafio');
     const inputVal = document.getElementById('inputContraSenha').value.trim();
-    if (!inputVal) return alert("⚠️ Digite a contra-senha.");
+    if (!inputVal) {
+        alert("⚠️ Digite a contra-senha.");
+        if (btn) { btn.disabled = false; btn.innerHTML = "🚀 Liberar Aplicativo"; }
+        return;
+    }
     
     const digitada = parseInt(inputVal, 10);
 
-    if (digitada === 1) {
-        alert("🛠️ [Teste] Forçando ativação do MODO DEMO...");
-        localStorage.setItem('driverflux_licenca_ativa', 'true');
-        localStorage.setItem('driverflux_modo_demo', 'true');
-        localStorage.setItem('driverflux_demo_ja_utilizada', 'true'); 
-        checarLicenciamento();
-        return;
-    }
+    // Atalho de teste removido
 
     if (digitada === obterSenhaDefinitiva(desafio)) {
         ativarVersãoCompletaDefinitiva();
@@ -98,6 +99,7 @@ function verificarAtivacao() {
         checarLicenciamento();
     } else { 
         alert("❌ Contra-senha incorreta!"); 
+        if (btn) { btn.disabled = false; btn.innerHTML = "🚀 Liberar Aplicativo"; }
     }
 }
 
@@ -176,21 +178,8 @@ function renderToggleAcoesDemo() {
         if (divApp) { divApp.insertBefore(containerAviso, divApp.firstChild); }
     }
     
-    containerAviso.innerText = `📈 Limite Demo: ${registros.length} de ${LIMITE_DEMO} registros. (Clique aqui para Ativar versão Oficial)`;
-    
-    containerAviso.onclick = function() {
-        let desafioAtual = localStorage.getItem('driverflux_codigo_desafio') || "0000";
-        let senhaUpgrade = prompt(`🔑 VALIDAÇÃO DEFINITIVA\nDesafio Atual: ${desafioAtual}\n\nInsira a Contra-Senha de Liberação Definitiva:`);
-        
-        if (senhaUpgrade) {
-            let digitadaUpgrade = parseInt(senhaUpgrade.trim(), 10);
-            if (digitadaUpgrade === obterSenhaDefinitiva(desafioAtual)) {
-                ativarVersãoCompletaDefinitiva();
-            } else {
-                alert("❌ Contra-senha definitiva inválida!");
-            }
-        }
-    };
+    containerAviso.innerText = `📈 Modo de Demonstração Ativo: ${registros.length} de ${LIMITE_DEMO} registros.`;
+    // Funcionalidade de upgrade via prompt removida para evitar acesso não autorizado
 }
 
 function abrirModalEdicao(id) { 
@@ -294,14 +283,26 @@ function verificarStatusTurnoMotorista() {
 }
 
 function abrirTurnoOperacional() {
+    const btn = document.getElementById('btnAbrirTurno');
+    if (btn && btn.disabled) return;
+    if (btn) { btn.disabled = true; btn.innerHTML = "⏳ Iniciando..."; }
+
     const troco = parseFloat(document.getElementById('inputTrocoInicial').value) || 0;
     const km = parseInt(document.getElementById('inputKmInicial').value) || 0;
     
     let elPrefix = document.getElementById('inputPrefixoCarro');
     let prefixo = elPrefix ? elPrefix.value.trim().toUpperCase() : "";
 
-    if(!prefixo) return alert("⚠️ Por favor, informe o Prefixo ou Placa do Carro que está assumindo.");
-    if(km <= 0) return alert("⚠️ Por favor, digite a quilometragem atual do Hodômetro.");
+    if(!prefixo) { 
+        alert("⚠️ Por favor, informe o Prefixo ou Placa do Carro que está assumindo."); 
+        if (btn) { btn.disabled = false; btn.innerHTML = "Iniciar Trabalho"; }
+        return; 
+    }
+    if(km <= 0) { 
+        alert("⚠️ Por favor, digite a quilometragem atual do Hodômetro."); 
+        if (btn) { btn.disabled = false; btn.innerHTML = "Iniciar Trabalho"; }
+        return; 
+    }
 
     const agora = new Date();
     const dataStr = agora.toLocaleDateString('pt-BR') + ' ' + agora.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
@@ -328,6 +329,10 @@ function abrirTurnoOperacional() {
 }
 
 async function salvarDados() {
+    const btn = document.getElementById('btnConfirmarSalvar');
+    if (btn && btn.disabled) return;
+    if (btn) { btn.disabled = true; btn.innerHTML = "⏳ Salvando..."; }
+
     const editId = document.getElementById('editId').value;
     const tipo = document.getElementById('inputTipoLancamento').value;
     const vCorrida = parseFloat(document.getElementById('inputCorrida').value) || 0;
@@ -335,11 +340,19 @@ async function salvarDados() {
     let vEmprestimo = 0;
     let whatsCliente = document.getElementById('inputWhatsCliente') ? document.getElementById('inputWhatsCliente').value.trim() : "";
 
-    if (vCorrida <= 0) return alert("⚠️ Digite o valor da corrida.");
+    if (vCorrida <= 0) {
+        alert("⚠️ Digite o valor da corrida.");
+        if (btn) { btn.disabled = false; btn.innerHTML = "Confirmar"; }
+        return;
+    }
     if (tipo === 'credito') {
         nomeCliente = document.getElementById('inputCliente').value.trim();
         vEmprestimo = parseFloat(document.getElementById('inputEmprestimo').value) || 0;
-        if (!nomeCliente) return alert("⚠️ Digite o nome do cliente.");
+        if (!nomeCliente) {
+            alert("⚠️ Digite o nome do cliente.");
+            if (btn) { btn.disabled = false; btn.innerHTML = "Confirmar"; }
+            return;
+        }
     }
 
     const gpsFinal = await capturarGpsPromessa();
@@ -366,17 +379,25 @@ async function salvarDados() {
                 dadosCorrida.id = parseInt(editId);
                 db.ref(`corridas_por_turno/${idTurnoAtivo}/${regOriginal.fbKey}`).update(dadosCorrida).then(() => {
                     finalizarSalvamento(dadosCorrida, whatsCliente);
-                }).catch(err => alert("Erro ao atualizar: " + err.message));
+                }).catch(err => {
+                    alert("Erro ao atualizar: " + err.message);
+                    if (btn) { btn.disabled = false; btn.innerHTML = "Confirmar"; }
+                });
             }
         } else {
             db.ref(`corridas_por_turno/${idTurnoAtivo}`).push(dadosCorrida).then(() => {
                 finalizarSalvamento(dadosCorrida, whatsCliente);
-            }).catch(err => alert("Erro ao salvar: " + err.message));
+            }).catch(err => {
+                alert("Erro ao salvar: " + err.message);
+                if (btn) { btn.disabled = false; btn.innerHTML = "Confirmar"; }
+            });
         }
     }
 }
 
 function finalizarSalvamento(dados, whats) {
+    const btn = document.getElementById('btnConfirmarSalvar');
+    if (btn) { btn.disabled = false; btn.innerHTML = "Confirmar"; }
     fecharModal(); renderizarTabela(); atualizarListaSugestoes();
     if (localStorage.getItem('driverflux_modo_demo') === 'true') { renderToggleAcoesDemo(); }
     if (dados.tipo === 'credito') { prepararDisparoReciboNativo(dados, whats); }
@@ -439,9 +460,17 @@ function renderizarTabela() {
 }
 
 function realizarLogin() {
+    const btn = document.getElementById('btnLogin');
+    if (btn && btn.disabled) return;
+    if (btn) { btn.disabled = true; btn.innerHTML = "⏳ Entrando..."; }
+
     const user = document.getElementById('loginUsuario').value.trim().toLowerCase();
     const pass = document.getElementById('loginSenha').value.trim();
-    if (!user || !pass) return alert("⚠️ Digite o usuário e a senha.");
+    if (!user || !pass) {
+        alert("⚠️ Digite o usuário e a senha.");
+        if (btn) { btn.disabled = false; btn.innerHTML = "🔑 Entrar no Sistema"; }
+        return;
+    }
     iniciarFirebaseSeNecessario();
     db.ref(`usuarios/${user}`).once('value').then((snapshot) => {
         if (snapshot.exists()) {
@@ -450,8 +479,11 @@ function realizarLogin() {
             if (senhaCorreta === pass) { 
                 localStorage.setItem('driverflux_usuario_logado', user); 
                 verificarSessaoLogin(); 
-            } else { alert("❌ Senha incorreta!"); }
-        } else { alert("❌ Usuário não cadastrado!"); }
+            } else { alert("❌ Senha incorreta!"); if (btn) { btn.disabled = false; btn.innerHTML = "🔑 Entrar no Sistema"; } }
+        } else { alert("❌ Usuário não cadastrado!"); if (btn) { btn.disabled = false; btn.innerHTML = "🔑 Entrar no Sistema"; } }
+    }).catch(err => {
+        alert("Erro ao realizar login: " + err.message);
+        if (btn) { btn.disabled = false; btn.innerHTML = "🔑 Entrar no Sistema"; }
     });
 }
 
@@ -602,10 +634,17 @@ function gerarRelatorio() {
     }
 }
 
-function encerarTurnoDefinitivo() { encerrarTurnoDefinitivo(); }
+// Removendo duplicata e corrigindo nome
+// function encerarTurnoDefinitivo() { encerrarTurnoDefinitivo(); }
 
 function encerrarTurnoDefinitivo() {
+    const btn = document.getElementById('btnFecharTurnoOficial');
+    if (btn && btn.disabled) return;
+    
     if (!confirm("Deseja realmente encerrar este turno?")) return;
+    
+    if (btn) { btn.disabled = true; btn.innerHTML = "⏳ Encerrando..."; }
+
     if (localStorage.getItem('driverflux_modo_demo') === 'true') {
         localStorage.setItem('driverflux_demo_status', 'fechado');
         location.reload(); return;
@@ -613,7 +652,10 @@ function encerrarTurnoDefinitivo() {
     iniciarFirebaseSeNecessario();
     db.ref(`turnos_operacionais/${usuarioLogado}/${idTurnoAtivo}`).update({
         status: 'fechado', fechamento: new Date().toLocaleString('pt-BR')
-    }).then(() => { alert("Turno encerrado com sucesso!"); location.reload(); });
+    }).then(() => { alert("Turno encerrado com sucesso!"); location.reload(); }).catch(err => {
+        alert("Erro ao encerrar turno: " + err.message);
+        if (btn) { btn.disabled = false; btn.innerHTML = "🔴 Encerrar Turno e Fechar Caixa"; }
+    });
 }
 
 function processarConsultaCliente() {
