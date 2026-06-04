@@ -1,250 +1,88 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DriverFlux - Sistema Integrado</title>
-    <style>
-        :root {
-            --bg-principal: #f4f6f9;
-            --card-bg: #ffffff;
-            --texto: #2d3748;
-            --texto-secundario: #718096;
-            --primary: #4f46e5;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--bg-principal); color: var(--texto); padding: 16px; display: flex; justify-content: center; }
-        .container-central { width: 100%; max-width: 500px; margin-top: 10px; }
-        
-        .card { background: var(--card-bg); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
-        .card h2 { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--texto); text-transform: uppercase; }
-        
-        .code-display { background: #edf2f7; border: 2px dashed var(--primary); padding: 15px; font-size: 22px; font-weight: 800; letter-spacing: 2px; text-align: center; border-radius: 12px; margin: 20px 0; }
-        
-        header { text-align: center; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-        header h1 { font-size: 24px; font-weight: 800; color: var(--primary); }
-        .user-badge { background: #e0e7ff; color: var(--primary); padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block; margin-top: 4px; }
-
-        .btn-grid-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
-        button { border: none; padding: 12px 8px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease; }
-        button:active { transform: scale(0.97); }
-
-        .btn-incluir { background: var(--primary); color: white; }
-        .btn-consultar { background: #4b5563; color: white; }
-        .btn-totais { background: #6366f1; color: white; }
-        .btn-relatorio { background: var(--success); color: white; }
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-logout { background: var(--danger); color: white; padding: 8px 14px; font-size: 12px; border-radius: 8px; font-weight: 700; }
-        .btn-cancel { background: #e2e8f0; color: var(--texto); width: 40%; }
-
-        .input-group { margin-bottom: 14px; }
-        .input-group label { display: block; font-size: 13px; font-weight: 600; color: var(--texto-secundario); margin-bottom: 4px; }
-        .input-group input, .input-group select { width: 100%; padding: 11px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 15px; outline: none; background: white; }
-
-        .search-container { display: none; margin-bottom: 16px; }
-        .search-box { display: flex; gap: 8px; margin-bottom: 12px; }
-        .search-box input { flex: 1; padding: 12px; border: 2px solid var(--primary); border-radius: 10px; font-size: 15px; outline: none; }
-
-        .client-ledger-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; display: none; }
-        .ledger-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; }
-        .ledger-row.balance { font-weight: 800; border-top: 1px dashed #cbd5e1; padding-top: 8px; margin-top: 8px; }
-
-        .table-wrapper { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 10px; font-size: 11px; color: var(--texto-secundario); border-bottom: 2px solid #edf2f7; text-transform: uppercase; }
-        td { padding: 12px 10px; font-size: 13px; border-bottom: 1px solid #edf2f7; }
-
-        .result-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
-        .result-row.total-final { margin-top: 14px; padding-top: 14px; border-top: 2px dashed #e2e8f0; font-size: 17px; font-weight: 800; color: var(--primary); }
-        .danger-text { color: var(--danger); font-weight: 600; }
-        .success-text { color: var(--success); font-weight: 600; }
-
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
-        .modal-content { background: var(--card-bg); padding: 24px; border-radius: 20px; width: 100%; max-width: 400px; box-shadow: var(--shadow); }
-        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
-        
-        .report-output { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; font-family: monospace; font-size: 12px; white-space: pre-wrap; display: none; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tx-ctrl - Controle Driver Flux</title>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--card2:#0f172a;--txt:#f8fafc;--muted:#94a3b8;--line:#334155;--pri:#6366f1;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444;--info:#38bdf8}*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}body{background:linear-gradient(135deg,#0f172a,#111827);color:var(--txt);padding:16px;min-height:100vh}.wrap{max-width:880px;margin:0 auto}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 18px}.brand h1{font-size:24px;color:#fff}.brand p{font-size:13px;color:var(--muted);margin-top:3px}.status{font-size:12px;border:1px solid var(--line);background:rgba(255,255,255,.04);padding:8px 10px;border-radius:999px;color:var(--muted)}.grid{display:grid;grid-template-columns:1fr;gap:14px}@media(min-width:760px){.grid.two{grid-template-columns:1fr 1fr}.grid.three{grid-template-columns:1fr 1fr 1fr}}.card{background:rgba(30,41,59,.96);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 14px 35px rgba(0,0,0,.25)}.card h2{font-size:15px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;color:#e2e8f0}.field{margin-bottom:12px}.field label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;margin-bottom:6px}input,select,textarea{width:100%;background:#020617;color:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 13px;font-size:15px;outline:none}input:focus,select:focus,textarea:focus{border-color:var(--pri)}textarea{min-height:80px;resize:vertical}.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.btns{display:grid;grid-template-columns:1fr;gap:8px;margin-top:10px}@media(min-width:520px){.btns.cols2{grid-template-columns:1fr 1fr}.btns.cols3{grid-template-columns:1fr 1fr 1fr}}button{border:0;border-radius:12px;padding:12px 10px;font-size:14px;font-weight:800;cursor:pointer;color:#fff;background:var(--pri);display:flex;align-items:center;justify-content:center;gap:6px}button:active{transform:scale(.98)}.ok{background:var(--ok)}.warn{background:var(--warn);color:#111827}.bad{background:var(--bad)}.dark{background:#475569}.info{background:var(--info);color:#082f49}.ghost{background:transparent;border:1px solid var(--line);color:#cbd5e1}.result{background:#020617;border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:10px}.result .title{font-size:12px;text-transform:uppercase;color:var(--muted);font-weight:800;margin-bottom:6px}.result .value{font-size:24px;font-weight:900;letter-spacing:1px}.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;background:#020617;border:1px solid var(--line);font-size:12px;color:#cbd5e1;margin:3px 4px 3px 0}.list{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:14px;background:#020617}.item{padding:12px;border-bottom:1px solid var(--line);cursor:pointer}.item:last-child{border-bottom:0}.item:hover{background:#111827}.item b{display:block;font-size:14px}.item small{color:var(--muted);font-size:12px}.muted{color:var(--muted);font-size:13px;line-height:1.45}.dangerBox{border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.08);border-radius:14px;padding:12px}.log{white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;max-height:220px;overflow:auto;background:#020617;border:1px solid var(--line);border-radius:14px;padding:12px;color:#cbd5e1}.hidden{display:none!important}
+</style>
 </head>
 <body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><h1>Tx-ctrl</h1><p>Painel particular de controle do Driver Flux</p></div>
+    <div class="status" id="firebaseStatus">Firebase: inicializando...</div>
+  </div>
 
-<div class="container-central">
+  <div class="grid two">
+    <section class="card">
+      <h2>🔑 Gerador de Contra-senhas</h2>
+      <div class="field"><label>Desafio do aplicativo</label><input type="number" id="txtDesafio" placeholder="Ex: 4852" oninput="calcularSenhas()"></div>
+      <div class="grid two">
+        <div class="result"><div class="title">Versão Completa</div><div class="value" id="senhaCompleta">---</div><button class="ok" onclick="copiarTexto('senhaCompleta')">Copiar Completa</button></div>
+        <div class="result"><div class="title">Versão Demo</div><div class="value" id="senhaDemo">---</div><button class="warn" onclick="copiarTexto('senhaDemo')">Copiar Demo</button></div>
+      </div>
+      <p class="muted" style="margin-top:10px">Completa: desafio × 13 + 6182. Demo: desafio × 11 + 3947.</p>
+    </section>
 
-    <div id="telaAtivacao" class="card" style="display: none; text-align: center;">
-        <h2>Ativação do Sistema</h2>
-        <div class="code-display" id="txtCodigoDesafio">------</div>
-        <div class="input-group" style="text-align: left;">
-            <label>Digite a Contra-Senha</label>
-            <input type="number" id="inputContraSenha" placeholder="Código de liberação">
-        </div>
-        <button id="btnAtivar" class="btn-incluir" style="width: 100%; margin-top: 15px;" onclick="verificarAtivacao()">🚀 Liberar Aplicativo</button>
+    <section class="card">
+      <h2>📍 Selecionar Ponto Existente</h2>
+      <div class="field"><label>Filtro</label><input id="filtroPonto" placeholder="Digite nome, número ou ID do ponto" oninput="renderizarPontos()"></div>
+      <div class="row">
+        <button class="info" onclick="carregarPontosFirebase()">Carregar Firebase</button>
+        <button class="ghost" onclick="abrirEntradaManualPonto()">Informar ID</button>
+      </div>
+      <div class="list" id="listaPontos" style="margin-top:12px"><div class="item"><small>Nenhum ponto carregado ainda.</small></div></div>
+    </section>
+  </div>
+
+  <section class="card" id="cardPontoSelecionado" style="margin-top:14px;display:none">
+    <h2>🏁 Ponto Selecionado</h2>
+    <div id="infoPontoSelecionado" class="muted"></div>
+    <div class="grid two" style="margin-top:12px">
+      <div>
+        <div class="field"><label>Prefixo / veículo do ponto</label><select id="selectPrefixo"><option value="">Carregue um ponto primeiro</option></select></div>
+        <button class="info" onclick="carregarPrefixosDoPonto()">Atualizar prefixos</button>
+      </div>
+      <div>
+        <div class="field"><label>Observação administrativa</label><textarea id="obsComando" placeholder="Ex: Cliente inadimplente, teste, manutenção..."></textarea></div>
+      </div>
     </div>
+  </section>
 
-    <div id="telaLogin" class="card" style="display: none;">
-        <h2 style="text-align: center; margin-bottom: 15px;">Acesso ao Turno</h2>
-        <div class="input-group">
-            <label>Identificação / Motorista</label>
-            <input type="text" id="loginUsuario" placeholder="Ex: andre, pedro ou master" autocomplete="off">
-        </div>
-        <div class="input-group">
-            <label>Senha de Acesso</label>
-            <input type="password" id="loginSenha" placeholder="******">
-        </div>
-        <button id="btnLogin" class="btn-incluir" style="width: 100%; margin-top: 10px;" onclick="realizarLogin()">🔑 Entrar no Sistema</button>
-    </div>
+  <div class="grid two" style="margin-top:14px">
+    <section class="card">
+      <h2>🛠️ Comandos administrativos</h2>
+      <p class="muted">Estes comandos são gravados no Firebase para o Driver Flux executar quando abrir/sincronizar. O Tx-ctrl não cadastra ponto, prefixo ou taxista.</p>
+      <div class="btns cols2">
+        <button class="bad" onclick="enviarComando('resetar_licenca')">Resetar licença</button>
+        <button class="bad" onclick="enviarComando('limpar_dados_ponto')">Limpar dados do ponto</button>
+        <button class="warn" onclick="enviarComando('bloquear')">Bloquear ponto</button>
+        <button class="ok" onclick="enviarComando('reativar')">Reativar ponto</button>
+      </div>
+      <div class="dangerBox" style="margin-top:12px"><b>Atenção:</b> limpar dados deve manter somente Master/licença/configuração, mas depende do Driver Flux obedecer ao comando remoto.</div>
+    </section>
 
-    <div id="telaAberturaTurno" class="card" style="display: none;">
-        <h2>🟢 Abrir Turno e Caixa</h2>
-        <div class="input-group">
-            <label>💰 Dinheiro de Troco Inicial (R$)</label>
-            <input type="number" id="inputTrocoInicial" value="0.00" step="0.01">
-        </div>
-        <div class="input-group">
-            <label>🚗 Hodômetro Inicial (KM Atual do Painel)</label>
-            <input type="number" id="inputKmInicial" placeholder="Ex: 142350">
-        </div>
-        <button id="btnAbrirTurno" class="btn-incluir" style="width: 100%; padding: 15px; font-size: 16px; margin-top: 10px;" onclick="abrirTurnoOperacional()">Iniciar Trabalho</button>
-    </div>
+    <section class="card">
+      <h2>📊 Monitoramento rápido</h2>
+      <div id="resumoPonto" class="muted">Selecione um ponto para ver resumo.</div>
+      <div class="btns cols2">
+        <button class="dark" onclick="lerResumoPonto()">Ler resumo</button>
+        <button class="ghost" onclick="exportarControleLocal()">Exportar controle JSON</button>
+      </div>
+    </section>
+  </div>
 
-    <div id="conteudoApp" style="display: none;">
-        <header>
-            <div>
-                <h1>DriverFlux</h1>
-                <span class="user-badge" id="lblUsuarioAtivo">Motorista: ---</span>
-                <div style="font-size: 11px; color: var(--texto-secundario); margin-top: 2px;" id="lblIdTurnoAtivo">Turno: ---</div>
-            </div>
-            <button class="btn-logout" onclick="efetuarLogout()">🚪 Sair</button>
-        </header>
-
-        <div id="painelFiltroMaster" class="card" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe;">
-            <div class="input-group" style="margin-bottom: 0;">
-                <label style="color: var(--primary);">📋 Selecionar Turno para Auditoria:</label>
-                <select id="selectFiltroTurnoMaster" onchange="selecionarTurnoParaVerificacaoMaster()">
-                    <option value="">Carregando histórico de caixas...</option>
-                </select>
-            </div>
-            <button class="btn-relatorio" style="width: 100%; margin-top: 12px; background: var(--primary);" onclick="cadastrarNovoMotoristaMaster()">👤 Cadastrar Novo Motorista</button>
-        </div>
-
-        <div class="btn-grid-actions">
-            <button class="btn-incluir" id="btnMenuIncluir" onclick="abrirModalEdicao(null)">➕ Incluir Corrida</button>
-            <button class="btn-consultar" onclick="alternarBarraConsulta()">🔍 Clientes / Pgto</button>
-            <button class="btn-totais" onclick="calcularTotais()">📊 Fechamento</button>
-            <button class="btn-relatorio" onclick="gerarRelatorio()">📄 Relatório</button>
-        </div>
-
-        <div class="search-container" id="containerPesquisa">
-            <div class="search-box">
-                <input type="text" id="inputPesquisa" placeholder="Buscar cliente no crédito..." list="listaClientesConsulta" oninput="processarConsultaCliente()">
-                <datalist id="listaClientesConsulta"></datalist>
-                <button onclick="limparConsulta()" style="background:#e2e8f0; padding:0 10px; border-radius:10px;">X</button>
-            </div>
-            <div class="client-ledger-box" id="fichaCliente">
-                <h3 id="ledgerNomeCliente" style="font-size:14px; color:var(--primary); margin-bottom:8px;">Extrato</h3>
-                <div class="ledger-row"><span>Acumulado no Crédito:</span> <span id="ledgerTotalDevido">R$ 0,00</span></div>
-                <div class="ledger-row"><span>Total Amortizado:</span> <span id="ledgerTotalPago" class="success-text">R$ 0,00</span></div>
-                <div class="ledger-row balance"><span>Saldo Pendente:</span> <span id="ledgerSaldoFinal">R$ 0,00</span></div>
-                <div style="display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0;">
-                    <input type="number" step="0.01" id="inputValorPagamento" placeholder="Valor pago (R$)" style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:8px;">
-                    <button class="btn-relatorio" style="padding:8px 12px;" onclick="registrarPagamento()">Amortizar</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <h2 id="tituloTabela">Corridas do Turno Atual</h2>
-            <div class="table-wrapper">
-                <table id="tabelaDados">
-                    <thead>
-                        <tr id="linhaCabecalhoTabela">
-                            <th>ID</th>
-                            <th>Tipo</th>
-                            <th>Info</th>
-                            <th>Valor</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="card" id="cardTotais" style="display: none;">
-            <h2>Resumo Financeiro Calculado</h2>
-            <div class="result-row"><span>Fundo/Troco Inicial:</span> <span id="totTrocoInicial">R$ 0,00</span></div>
-            <div class="result-row"><span>Corridas Normais (Dinheiro):</span> <span id="totNormais" class="success-text">R$ 0,00</span></div>
-            <div class="result-row"><span>Corridas no Crédito:</span> <span id="totCorridasCredito">R$ 0,00</span></div>
-            <div class="result-row"><span>Dinheiro Emprestado:</span> <span id="totBruto">R$ 0,00</span></div>
-            <div class="result-row"><span>Taxa do Ponto (+20%):</span> <span id="totAcrescimo" class="danger-text">+ R$ 0,00</span></div>
-            <div class="result-row total-final"><span>Dinheiro Vivo Esperado:</span> <span id="totGeral">R$ 0,00</span></div>
-            
-            <button class="btn-danger" id="btnFecharTurnoOficial" style="width:100%; margin-top:15px; padding:12px;" onclick="encerrarTurnoDefinitivo()">🔴 Encerrar Turno e Fechar Caixa</button>
-            <button class="btn-cancel" style="width:100%; margin-top:10px; padding:10px;" onclick="fecharCard('cardTotais')">Voltar / Cancelar</button>
-        </div>
-
-        <div class="card" id="cardRelatorio" style="display: none;">
-            <h2>Relatório de Turno</h2>
-            <div class="report-output" id="reportOutput"></div>
-            <button class="btn-relatorio" style="margin-top:12px; width:100%;" onclick="window.print()">🖨️ Imprimir Fechamento</button>
-            <button class="btn-cancel" style="width:100%; margin-top:10px; padding:10px;" onclick="fecharCard('cardRelatorio')">Voltar ao Menu</button>
-        </div>
-    </div>
-</div>
-
-<div class="modal" id="formModal">
-    <div class="modal-content">
-        <h3 id="modalTitle">Lançar Corrida</h3>
-        <input type="hidden" id="editId">
-        
-        <div class="input-group">
-            <label for="inputTipoLancamento">Modalidade da Corrida</label>
-            <select id="inputTipoLancamento" onchange="ajustarCamposPorModalidade()">
-                <option value="normal" selected>🟢 Corrida Normal (Paga na Hora)</option>
-                <option value="credito">🟡 Corrida no Crédito (Fiado/Pendência)</option>
-            </select>
-        </div>
-
-        <div class="input-group">
-            <label for="inputCorrida">Valor da Corrida (R$)</label>
-            <input type="number" step="0.01" id="inputCorrida" placeholder="0,00">
-        </div>
-
-        <div id="camposCreditoOpcionais" style="display: none; background: #f8fafc; padding: 10px; border-radius: 10px; margin-bottom: 14px; border: 1px solid #e2e8f0;">
-            <div class="input-group">
-                <label for="inputCliente">Nome do Cliente</label>
-                <input type="text" id="inputCliente" placeholder="Quem vai dever?" list="listaClientes" autocomplete="off">
-                <datalist id="listaClientes"></datalist>
-            </div>
-            <div class="input-group">
-                <label for="inputWhatsCliente">📱 WhatsApp do Cliente Novo (Com DDD)</label>
-                <input type="number" id="inputWhatsCliente" placeholder="Ex: 51999998888">
-            </div>
-            <div class="input-group" style="margin-bottom:0;">
-                <label for="inputEmprestimo">Adicionar Dinheiro Emprestado (R$)</label>
-                <input type="number" step="0.01" id="inputEmprestimo" value="0">
-            </div>
-        </div>
-
-        <div class="modal-buttons">
-            <button class="btn-cancel" onclick="fecharModal()">Voltar</button>
-            <button id="btnConfirmarSalvar" class="btn-incluir" style="flex: 1;" onclick="salvarDados()">Confirmar</button>
-        </div>
-        
-    </div>
+  <section class="card" style="margin-top:14px">
+    <h2>🧾 Log</h2>
+    <div class="log" id="logSaida">Pronto.</div>
+  </section>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="cordova.js"></script>
-
-<script src="js/geolocation.js"></script>
 <script src="js/app.js"></script>
-
 </body>
 </html>
-
