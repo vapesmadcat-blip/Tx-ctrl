@@ -1,4 +1,4 @@
-/* Tx-ctrl - Painel particular de controle Driver Flux
+/* TXCTRL - Painel particular de controle Driver Flux
    Este app NÃO cadastra ponto, prefixo ou taxista.
    Ele lê pontos existentes no Firebase, gera contra-senhas e grava comandos administrativos. */
 
@@ -240,7 +240,7 @@ async function lerResumoPonto() {
 
 function exportarControleLocal() {
   const payload = {
-    app: 'Tx-ctrl Driver Flux',
+    app: 'TXCTRL',
     exportadoEm: new Date().toISOString(),
     pontoSelecionado,
     pontosCache,
@@ -250,7 +250,7 @@ function exportarControleLocal() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `TxCtrl_DriverFlux_${Date.now()}.json`;
+  a.download = `TXCTRL_${Date.now()}.json`;
   a.click();
   URL.revokeObjectURL(url);
   log('Controle local exportado em JSON.');
