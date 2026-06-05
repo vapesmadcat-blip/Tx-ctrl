@@ -1,6 +1,6 @@
 {
-  "name": "com.driverflux.app",
-  "displayName": "DriverFlux",
+  "name": "com.txctrl.app",
+  "displayName": "TXCTRL",
   "version": "1.0.0",
   "description": "App para gestão de corridas",
   "main": "index.js",
