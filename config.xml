@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget id="com.driverflux.app" version="1.0.0">
-    <name>DriverFlux</name>
+<widget id="com.txctrl.app" version="1.0.0">
+    <name>TXCTRL</name>
     <description>Sistema de Gestão de Corridas e Frota de Táxi</description>
     
     <!-- Permissões para GPS e Localização -->
